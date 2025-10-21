@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { User, Mail, BookOpen, Users, Calendar, Star, Award, TrendingUp, UserX, AlertTriangle, Clock, Loader2 } from 'lucide-react';
 import type { Mentor } from '../types';
 import Modal from './Modal';
@@ -34,6 +34,12 @@ const MentorModal: React.FC<MentorModalProps> = ({ isOpen, onClose, mentor, mode
     rating: 0
   });
 
+  const [batches, setBatches] = useState<Array<{id: number, batch_name: string, academic_year: string, semester: number}>>([]);
+  const [courses, setCourses] = useState<Array<{id: number, course_name: string, course_code?: string}>>([]);
+  const [loadingBatches, setLoadingBatches] = useState(false);
+  const [loadingCourses, setLoadingCourses] = useState(false);
+  const [selectedCourseId, setSelectedCourseId] = useState<number>(1);
+
   const programs = [
     'Full Stack Development',
     'Data Science Bootcamp',
@@ -41,12 +47,48 @@ const MentorModal: React.FC<MentorModalProps> = ({ isOpen, onClose, mentor, mode
     'Machine Learning Advanced'
   ];
 
-  const batches = [
-    'Batch 2024-A',
-    'Batch 2024-B',
-    'Batch 2024-C',
-    'Batch 2024-D'
-  ];
+  // Fetch batches when modal opens
+  useEffect(() => {
+    if (isOpen && mode === 'add') {
+      fetchBatches();
+      fetchCourses();
+    }
+  }, [isOpen, mode]);
+
+  const fetchBatches = async () => {
+    try {
+      setLoadingBatches(true);
+      const response = await api.lms.adminMentors.getAllBatches();
+      if (response.batches) {
+        setBatches(response.batches);
+        // Set default to a known working batch ID
+        if (response.batches.length > 0) {
+          setEditData(prev => ({ ...prev, batch: response.batches[0].batch_name }));
+        }
+      }
+    } catch (error) {
+      // Error fetching batches
+    } finally {
+      setLoadingBatches(false);
+    }
+  };
+
+  const fetchCourses = async () => {
+    try {
+      setLoadingCourses(true);
+      // Fetch actual courses from the Live LMS backend
+      const response = await api.lms.adminMentors.getAllCourses();
+      if (response.courses) {
+        setCourses(response.courses);
+        // Use a known working course ID (Full Stack Development 2)
+        setSelectedCourseId(4);
+      }
+    } catch (error) {
+      // Error fetching courses
+    } finally {
+      setLoadingCourses(false);
+    }
+  };
 
   const expertiseOptions = [
     'React', 'Node.js', 'MongoDB', 'JavaScript', 'Python', 'Machine Learning',
@@ -61,27 +103,59 @@ const MentorModal: React.FC<MentorModalProps> = ({ isOpen, onClose, mentor, mode
       setSuccess(null);
 
       if (mode === 'add') {
-        // Invite new mentor
-        const result = await api.lms.mentors.invite({
-          name: editData.name,
-          email: editData.email,
-          program: editData.program,
-          batch: editData.batch,
+        // Validation
+        if (!editData.name.trim()) {
+          setError('Name is required');
+          return;
+        }
+        if (!editData.email.trim()) {
+          setError('Email is required');
+          return;
+        }
+        if (!editData.email.includes('@')) {
+          setError('Please enter a valid email address');
+          return;
+        }
+        if (editData.expertise.length === 0) {
+          setError('Please select at least one expertise area');
+          return;
+        }
+        if (!editData.batch) {
+          setError('Please select a batch');
+          return;
+        }
+
+        // Find the selected batch ID
+        const selectedBatch = batches.find(batch => batch.batch_name === editData.batch);
+        if (!selectedBatch) {
+          setError('Please select a valid batch');
+          return;
+        }
+
+        // Add new mentor using Live LMS adminMentors endpoint
+        const result = await api.lms.adminMentors.addMentor({
+          name: editData.name.trim(),
+          email: editData.email.trim(),
           expertise: editData.expertise,
-          maxStudents: editData.maxStudents
+          dateOfJoining: editData.joinDate || new Date().toISOString().split('T')[0],
+          courseId: selectedCourseId, // Use selected course ID
+          batchId: selectedBatch.id
         });
 
-        setSuccess('Mentor invited successfully! They will receive an email with login instructions.');
+        if (result.message === 'Faculty created successfully') {
+          // The Live LMS backend returns defaultPassword: "1"
+          const password = result.data?.defaultPassword || result.data?.generatedPassword || '1';
+          setSuccess(`Mentor created successfully! Login credentials: Email: ${editData.email}, Password: ${password}`);
+        } else {
+          setSuccess('Mentor invited successfully!');
+        }
 
         // Refresh mentor list
         if (onMentorUpdated) {
           onMentorUpdated();
         }
 
-        // Close modal after a short delay to show success message
-        setTimeout(() => {
-          onClose();
-        }, 2000);
+        // Don't auto-close modal - let admin manually close to see the password
       } else if (mode === 'edit' && mentor) {
         // Update existing mentor
         const result = await api.lms.mentors.update(mentor.id, {
@@ -142,10 +216,17 @@ const MentorModal: React.FC<MentorModalProps> = ({ isOpen, onClose, mentor, mode
       <div className="space-y-6">
         {/* Success Message */}
         {success && (
-          <div className="bg-green-500/10 border border-green-500/20 rounded-xl p-4">
-            <div className="flex items-center space-x-2">
-              <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-              <span className="text-green-400 font-medium">{success}</span>
+          <div className="bg-green-500/10 border border-green-500/20 rounded-xl p-6">
+            <div className="flex items-start space-x-3">
+              <div className="w-3 h-3 bg-green-500 rounded-full mt-1 flex-shrink-0"></div>
+              <div className="flex-1">
+                <div className="text-green-400 font-semibold text-lg mb-2">✅ Mentor Created Successfully!</div>
+                <div className="text-green-300 text-sm mb-3">{success}</div>
+                <div className="bg-gray-800/50 rounded-lg p-3 border border-gray-600">
+                  <div className="text-yellow-400 font-medium text-sm mb-1">⚠️ Important:</div>
+                  <div className="text-gray-300 text-sm">Please copy the login credentials above and share them with the mentor. Close this modal when done.</div>
+                </div>
+              </div>
             </div>
           </div>
         )}
@@ -207,7 +288,7 @@ const MentorModal: React.FC<MentorModalProps> = ({ isOpen, onClose, mentor, mode
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <div>
             <label className="block text-sm font-medium text-gray-300 mb-2">
-              Program
+              Course
             </label>
             {mode === 'view' ? (
               <div className="bg-gray-800 px-3 py-2 rounded-lg text-white">
@@ -215,14 +296,15 @@ const MentorModal: React.FC<MentorModalProps> = ({ isOpen, onClose, mentor, mode
               </div>
             ) : (
               <select
-                value={editData.program}
-                onChange={(e) => setEditData({ ...editData, program: e.target.value })}
+                value={selectedCourseId}
+                onChange={(e) => setSelectedCourseId(parseInt(e.target.value))}
                 className="w-full bg-gray-800 border border-gray-700 text-white rounded-lg px-3 py-2 focus:border-yellow-500 focus:outline-none"
+                disabled={loadingCourses}
               >
-                <option value="">Select Program</option>
-                {programs.map((program) => (
-                  <option key={program} value={program}>
-                    {program}
+                <option value="">{loadingCourses ? 'Loading courses...' : 'Select Course'}</option>
+                {courses.map((course) => (
+                  <option key={course.id} value={course.id}>
+                    {course.course_name}
                   </option>
                 ))}
               </select>
@@ -242,11 +324,12 @@ const MentorModal: React.FC<MentorModalProps> = ({ isOpen, onClose, mentor, mode
                 value={editData.batch}
                 onChange={(e) => setEditData({ ...editData, batch: e.target.value })}
                 className="w-full bg-gray-800 border border-gray-700 text-white rounded-lg px-3 py-2 focus:border-yellow-500 focus:outline-none"
+                disabled={loadingBatches}
               >
-                <option value="">Select Batch</option>
+                <option value="">{loadingBatches ? 'Loading batches...' : 'Select Batch'}</option>
                 {batches.map((batch) => (
-                  <option key={batch} value={batch}>
-                    {batch}
+                  <option key={batch.id} value={batch.batch_name}>
+                    {batch.batch_name} ({batch.academic_year} - Semester {batch.semester})
                   </option>
                 ))}
               </select>

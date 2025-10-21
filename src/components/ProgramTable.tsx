@@ -24,38 +24,20 @@ const ProgramTable: React.FC<ProgramTableProps> = ({ onViewProgram, onEditProgra
         setLoading(true);
         setError(null);
 
-        // Get programs from UMS backend
-        const programsData = await api.ums.programs.getAll();
+        // Get programs from Live LMS backend
+        const programsData = await api.lms.adminPrograms.getProgramStats();
 
         // Transform the data to match our Program interface
-        const transformedPrograms: Program[] = programsData.data.map((course: any) => {
-          // Get the first batch/cohort for this course
-          const firstSection = course.course_sections?.[0];
-          const batch = firstSection?.batches;
-
-          // Count unique mentors assigned to this course
-          const mentorIds = new Set();
-          course.course_sections?.forEach((section: any) => {
-            section.faculty_sections_mapping?.forEach((mapping: any) => {
-              if (mapping.faculty_id) {
-                mentorIds.add(mapping.faculty_id);
-              }
-            });
-          });
-
-          // Count total sessions for this course (we'll need to get this from sessions)
-          // For now, we'll use the sessions field from the course if available
-          const sessionCount = course.sessions || 0;
-
+        const transformedPrograms: Program[] = programsData.data.map((program: any, index: number) => {
           return {
-            id: course.id.toString(),
-            name: course.course_name,
-            cohort: batch?.batch_name || 'No Batch Assigned',
-            mentors: mentorIds.size,
-            sessions: sessionCount,
-            status: course.active === 'active' ? 'active' : 'inactive',
-            startDate: firstSection?.start_date || course.created_at?.split('T')[0] || 'N/A',
-            endDate: firstSection?.end_date || 'N/A'
+            id: `${program.program_id}-${program.cohort}-${index}` || Math.random().toString(),
+            name: program.program_name || 'Unknown Program',
+            cohort: program.cohort || 'No Batch Assigned',
+            mentors: program.mentors_count || 0,
+            sessions: program.sessions_count || 0,
+            status: program.status === 'Active' ? 'active' : 'inactive',
+            startDate: program.start_date || 'N/A',
+            endDate: program.end_date || 'N/A'
           };
         });
 
@@ -112,7 +94,7 @@ const ProgramTable: React.FC<ProgramTableProps> = ({ onViewProgram, onEditProgra
     };
 
     fetchPrograms();
-  }, [api.ums.programs]);
+  }, [api.lms.adminPrograms]);
 
   const handleSort = (field: keyof Program) => {
     if (sortField === field) {
@@ -132,9 +114,9 @@ const ProgramTable: React.FC<ProgramTableProps> = ({ onViewProgram, onEditProgra
       const aVal = a[sortField];
       const bVal = b[sortField];
       if (sortDirection === 'asc') {
-        return aVal < bVal ? -1 : aVal > bVal ? 1 : 0;
+        return (aVal || '') < (bVal || '') ? -1 : (aVal || '') > (bVal || '') ? 1 : 0;
       } else {
-        return aVal > bVal ? -1 : aVal < bVal ? 1 : 0;
+        return (aVal || '') > (bVal || '') ? -1 : (aVal || '') < (bVal || '') ? 1 : 0;
       }
     });
 
@@ -250,10 +232,11 @@ const ProgramTable: React.FC<ProgramTableProps> = ({ onViewProgram, onEditProgra
             {filteredPrograms.map((program) => (
               <tr
                 key={program.id}
-                className="hover:bg-gray-800/50 transition-colors"
+                className="hover:bg-gray-800/50 transition-colors cursor-pointer group"
+                onClick={() => onViewProgram(program)}
               >
                 <td className="px-6 py-4">
-                  <div className="text-white font-medium">{program.name}</div>
+                  <div className="text-white font-medium group-hover:text-yellow-400 transition-colors">{program.name}</div>
                 </td>
                 <td className="px-6 py-4">
                   <div className="text-gray-300">{program.cohort}</div>
@@ -272,18 +255,27 @@ const ProgramTable: React.FC<ProgramTableProps> = ({ onViewProgram, onEditProgra
                 <td className="px-6 py-4 text-right">
                   <div className="flex items-center justify-end space-x-2">
                     <button
-                      onClick={() => onViewProgram(program)}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onViewProgram(program);
+                      }}
                       className="p-1 text-gray-400 hover:text-yellow-500 transition-colors"
                     >
                       <Eye className="w-4 h-4" />
                     </button>
                     <button
-                      onClick={() => onEditProgram(program)}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onEditProgram(program);
+                      }}
                       className="p-1 text-gray-400 hover:text-yellow-500 transition-colors"
                     >
                       <Edit className="w-4 h-4" />
                     </button>
-                    <button className="p-1 text-gray-400 hover:text-yellow-500 transition-colors">
+                    <button 
+                      onClick={(e) => e.stopPropagation()}
+                      className="p-1 text-gray-400 hover:text-yellow-500 transition-colors"
+                    >
                       <MoreVertical className="w-4 h-4" />
                     </button>
                   </div>

@@ -1,7 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { Search, Eye, CreditCard as Edit, MoreVertical, ArrowUpDown, Filter, UserPlus, Loader2, AlertCircle, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Search, Eye, CreditCard as Edit, MoreVertical, ArrowUpDown, Filter, UserPlus, Loader2, AlertCircle, ChevronLeft, ChevronRight, Upload } from 'lucide-react';
 import type { Student } from '../types';
 import { useApi } from '../services/api';
+import { useAuth } from '../contexts/AuthContext';
+import BulkUploadModal from './BulkUploadModal';
 
 interface StudentTableProps {
   onViewStudent: (student: Student) => void;
@@ -10,6 +12,7 @@ interface StudentTableProps {
 }
 
 const StudentTable: React.FC<StudentTableProps> = ({ onViewStudent, onEditStudent, onAddStudent }) => {
+  const { user } = useAuth();
   const [searchTerm, setSearchTerm] = useState('');
   const [sortField, setSortField] = useState<keyof Student>('name');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
@@ -22,10 +25,10 @@ const StudentTable: React.FC<StudentTableProps> = ({ onViewStudent, onEditStuden
   const [totalCount, setTotalCount] = useState(0);
   const [hasNextPage, setHasNextPage] = useState(false);
   const [hasPrevPage, setHasPrevPage] = useState(false);
+  const [showBulkUpload, setShowBulkUpload] = useState(false);
   const api = useApi();
 
-  useEffect(() => {
-    const fetchStudents = async () => {
+  const fetchStudents = async () => {
       try {
         setLoading(true);
         setError(null);
@@ -114,8 +117,9 @@ const StudentTable: React.FC<StudentTableProps> = ({ onViewStudent, onEditStuden
       }
     };
 
+  useEffect(() => {
     fetchStudents();
-  }, [api.ums.students, currentPage]);
+  }, [currentPage]);
 
   const handleSort = (field: keyof Student) => {
     if (sortField === field) {
@@ -223,6 +227,17 @@ const StudentTable: React.FC<StudentTableProps> = ({ onViewStudent, onEditStuden
               <UserPlus className="w-4 h-4" />
               <span>Add Student</span>
             </button>
+            
+            {/* Bulk Upload Button - Only for Admin */}
+            {user?.userType === 'admin' && (
+              <button
+                onClick={() => setShowBulkUpload(true)}
+                className="flex items-center space-x-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium"
+              >
+                <Upload className="w-4 h-4" />
+                <span>Bulk Upload</span>
+              </button>
+            )}
             {/* Search */}
             <div className="relative">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
@@ -422,6 +437,17 @@ const StudentTable: React.FC<StudentTableProps> = ({ onViewStudent, onEditStuden
           </div>
         </div>
       </div>
+      
+      {/* Bulk Upload Modal */}
+      <BulkUploadModal
+        isOpen={showBulkUpload}
+        onClose={() => setShowBulkUpload(false)}
+        onUploadComplete={() => {
+          setShowBulkUpload(false);
+          // Refresh the student list
+          fetchStudents();
+        }}
+      />
     </div>
   );
 };

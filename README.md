@@ -31,7 +31,7 @@ Modern React-based Learning Management System frontend for Polaris with TypeScri
 
 - Node.js 18+ 
 - npm or yarn
-- Polaris UMS backend running on port 8085
+- Polaris UMS backend running on port 10000
 
 ### Installation
 
@@ -65,7 +65,7 @@ Create a `.env` file in the root directory with your configuration:
 
 ```env
 # Backend API URLs
-UMS_BASE_URL=http://localhost:8085
+UMS_BASE_URL=http://localhost:10000
 LMS_BASE_URL=https://live-class-lms1-672553132888.asia-south1.run.app
 MULTIMEDIA_BASE_URL=http://localhost:3002
 
@@ -82,7 +82,7 @@ NODE_ENV=development
 
 | Variable | Description | Default |
 |----------|-------------|---------|
-| `UMS_BASE_URL` | User Management System API URL | `http://localhost:8085` |
+| `UMS_BASE_URL` | User Management System API URL | `http://localhost:10000` |
 | `LMS_BASE_URL` | Learning Management System API URL | `https://live-class-lms1-672553132888.asia-south1.run.app` |
 | `MULTIMEDIA_BASE_URL` | Multimedia Service API URL | `http://localhost:3002` |
 | `GOOGLE_CLIENT_ID` | Google OAuth Client ID | - |

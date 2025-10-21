@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { AlertTriangle } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
+import { useApi } from '../services/api';
 import Navbar from '../components/Navbar';
 import SummaryCards from '../components/SummaryCards';
 import ProgramDashboard from '../components/ProgramDashboard';
@@ -18,7 +19,8 @@ import MentorModal from '../components/MentorModal';
 import type { Program, Student, Mentor } from '../types';
 
 const Dashboard: React.FC = () => {
-  const { user, logout } = useAuth();
+  const { user } = useAuth();
+  const api = useApi();
   const [currentView, setCurrentView] = useState<'dashboard' | 'programs' | 'students' | 'mentors' | 'reports' | 'alerts'>('dashboard');
   const [selectedProgram, setSelectedProgram] = useState<Program | null>(null);
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
@@ -126,6 +128,68 @@ const Dashboard: React.FC = () => {
   };
 
   const handleBulkUpload = () => {
+    // Create a hidden file input element
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = '.csv';
+    input.style.display = 'none';
+    
+    // Add event listener for file selection
+    input.addEventListener('change', async (event) => {
+      const file = (event.target as HTMLInputElement).files?.[0];
+      if (file) {
+        if (file.type === 'text/csv' || file.name.endsWith('.csv')) {
+          // Show batch selection modal or use a default batch
+          // For now, let's use batch ID 1 as default
+          try {
+            // Try Live LMS adminStudents bulk upload endpoint first
+            try {
+              const formData = new FormData();
+              formData.append('file', file);
+              formData.append('batchId', '1'); // Default batch ID, can be made dynamic later
+              
+              const result = await api.lms.adminStudents.bulkUploadStudents(formData);
+              
+              if (result.message && result.message.includes('success')) {
+                alert(`Successfully uploaded students from CSV file`);
+                // Refresh the student list if we're on the students tab
+                if (currentView === 'students') {
+                  // Trigger a refresh by changing the view and back
+                  setCurrentView('dashboard');
+                  setTimeout(() => setCurrentView('students'), 100);
+                }
+                return;
+              }
+            } catch (lmsError) {
+            }
+            
+            // Fallback to UMS bulk upload
+            const result = await (api as any).students.bulkEnroll(file, 1);
+            
+            if (result.success) {
+              alert(`Successfully uploaded ${result.count || 'students'} from CSV file`);
+              // Refresh the student list if we're on the students tab
+              if (currentView === 'students') {
+                // Trigger a refresh by changing the view and back
+                setCurrentView('dashboard');
+                setTimeout(() => setCurrentView('students'), 100);
+              }
+            } else {
+              alert(result.message || 'Upload failed');
+            }
+          } catch (error: any) {
+            alert(`Upload failed: ${error.message}`);
+          }
+        } else {
+          alert('Please select a CSV file');
+        }
+      }
+    });
+    
+    // Trigger the file picker
+    document.body.appendChild(input);
+    input.click();
+    document.body.removeChild(input);
   };
 
   const handleNotificationClick = () => {

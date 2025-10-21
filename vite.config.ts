@@ -7,18 +7,8 @@ export default defineConfig({
   server: {
     proxy: {
       '/ums': {
-        target: 'http://localhost:8085',
+        target: 'http://localhost:10000',
         changeOrigin: true
-      },
-      '/lms': {
-        target: 'http://localhost:8080',
-        changeOrigin: true,
-        rewrite: (path) => path.replace(/^\/lms/, '')
-      },
-      '/multimedia': {
-        target: 'http://localhost:8080',
-        changeOrigin: true,
-        rewrite: (path) => path.replace(/^\/multimedia/, '')
       }
     }
   }

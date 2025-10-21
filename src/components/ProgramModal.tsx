@@ -15,7 +15,6 @@ const ProgramModal: React.FC<ProgramModalProps> = ({ isOpen, onClose, program, m
     id: '',
     name: '',
     cohort: '',
-    mentors: 0,
     sessions: 0,
     status: 'active' as Program['status'],
     startDate: '',
@@ -31,6 +30,11 @@ const ProgramModal: React.FC<ProgramModalProps> = ({ isOpen, onClose, program, m
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
   const [reschedules, setReschedules] = useState<any[]>([]);
   const [loadingReschedules, setLoadingReschedules] = useState(false);
+  const [batches, setBatches] = useState<Array<{id: number, batch_name: string, academic_year: string, semester: number}>>([]);
+  const [faculties, setFaculties] = useState<Array<{user_id: string, name: string}>>([]);
+  const [selectedBatchId, setSelectedBatchId] = useState<number>(1);
+  const [selectedFacultyId, setSelectedFacultyId] = useState<string>('');
+  const [loading, setLoading] = useState(false);
   const api = useApi();
 
   // Fetch reschedule data when modal opens and program is selected
@@ -54,6 +58,40 @@ const ProgramModal: React.FC<ProgramModalProps> = ({ isOpen, onClose, program, m
       fetchReschedules();
     }
   }, [isOpen, program, mode, api.ums.programs]);
+
+  // Fetch batches and faculties when creating a new program
+  useEffect(() => {
+    if (isOpen && mode === 'edit' && !program) {
+      const fetchData = async () => {
+        try {
+          setLoading(true);
+          const [batchesResponse, facultiesResponse] = await Promise.all([
+            api.lms.adminMentors.getAllBatches(),
+            api.lms.adminPrograms.getAllFaculties()
+          ]);
+          
+          if (batchesResponse.batches) {
+            setBatches(batchesResponse.batches);
+            if (batchesResponse.batches.length > 0) {
+              setSelectedBatchId(batchesResponse.batches[0].id);
+            }
+          }
+          
+          if (facultiesResponse.faculties) {
+            setFaculties(facultiesResponse.faculties);
+            if (facultiesResponse.faculties.length > 0) {
+              setSelectedFacultyId(facultiesResponse.faculties[0].user_id);
+            }
+          }
+        } catch (error) {
+        } finally {
+          setLoading(false);
+        }
+      };
+
+      fetchData();
+    }
+  }, [isOpen, mode, program, api.lms.mentors, api.lms.programs]);
 
   const mockMentors = [
     { id: '1', name: 'Dr. Sarah Wilson', status: 'available' },
@@ -167,8 +205,51 @@ const ProgramModal: React.FC<ProgramModalProps> = ({ isOpen, onClose, program, m
   const topRescheduler = Object.entries(mentorRescheduleCounts)
     .sort(([,a], [,b]) => b - a)[0];
 
-  const handleSave = () => {
-    onClose();
+  const handleSave = async () => {
+    if (mode === 'edit' && !program) {
+      // Creating a new program
+      try {
+        setLoading(true);
+        
+        if (faculties.length === 0) {
+          alert('No faculties available. Please add a faculty first.');
+          return;
+        }
+
+        if (batches.length === 0) {
+          alert('No batches available. Please add a batch first.');
+          return;
+        }
+
+        const programData = {
+          courseName: editData.name,
+          batchId: selectedBatchId,
+          startDate: editData.startDate,
+          endDate: editData.endDate,
+          facultyId: selectedFacultyId,
+          active: editData.status,
+          sessions: editData.sessions,
+          theoryHours: 30, // Default values
+          practicalHours: 30
+        };
+
+        const result = await api.lms.adminPrograms.createProgram(programData);
+        
+        if (result.message === 'Course created successfully.') {
+          alert('Program created successfully!');
+          onClose();
+        } else {
+          alert('Failed to create program: ' + (result.error || 'Unknown error'));
+        }
+      } catch (error: any) {
+        alert('Error creating program: ' + error.message);
+      } finally {
+        setLoading(false);
+      }
+    } else {
+      // Editing existing program or just closing
+      onClose();
+    }
   };
 
   const handleMentorSelect = (mentor: any) => {
@@ -267,6 +348,49 @@ const ProgramModal: React.FC<ProgramModalProps> = ({ isOpen, onClose, program, m
                   )}
                 </div>
               </div>
+
+              {/* Batch and Faculty Selection - Only show when creating new program */}
+              {mode === 'edit' && !program && (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="bg-gray-800/50 rounded-xl p-6 border border-gray-700/50">
+                    <label className="block text-sm font-medium text-gray-300 mb-3">
+                      Batch
+                    </label>
+                    <select
+                      value={selectedBatchId}
+                      onChange={(e) => setSelectedBatchId(parseInt(e.target.value))}
+                      className="w-full h-12 px-4 bg-gray-800 border border-gray-700 text-white rounded-lg focus:border-yellow-500 focus:ring-2 focus:ring-yellow-500/20 focus:outline-none transition-all duration-200"
+                      disabled={loading}
+                    >
+                      <option value="">{loading ? 'Loading batches...' : 'Select Batch'}</option>
+                      {batches.map((batch) => (
+                        <option key={batch.id} value={batch.id}>
+                          {batch.batch_name} ({batch.academic_year} - Semester {batch.semester})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div className="bg-gray-800/50 rounded-xl p-6 border border-gray-700/50">
+                    <label className="block text-sm font-medium text-gray-300 mb-3">
+                      Faculty
+                    </label>
+                    <select
+                      value={selectedFacultyId}
+                      onChange={(e) => setSelectedFacultyId(e.target.value)}
+                      className="w-full h-12 px-4 bg-gray-800 border border-gray-700 text-white rounded-lg focus:border-yellow-500 focus:ring-2 focus:ring-yellow-500/20 focus:outline-none transition-all duration-200"
+                      disabled={loading}
+                    >
+                      <option value="">{loading ? 'Loading faculties...' : 'Select Faculty'}</option>
+                      {faculties.map((faculty) => (
+                        <option key={faculty.user_id} value={faculty.user_id}>
+                          {faculty.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+              )}
 
               {/* Form Fields Grid - Responsive 2/3 columns */}
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -367,7 +491,7 @@ const ProgramModal: React.FC<ProgramModalProps> = ({ isOpen, onClose, program, m
                         program?.status === 'completed' ? 'text-yellow-400 bg-yellow-400/10' :
                         'text-gray-400 bg-gray-400/10'
                       }`}>
-                        {program?.status?.charAt(0).toUpperCase() + program?.status?.slice(1) || 'N/A'}
+                        {program?.status ? program.status.charAt(0).toUpperCase() + program.status.slice(1) : 'N/A'}
                       </span>
                     </div>
                   ) : (
@@ -642,8 +766,16 @@ const ProgramModal: React.FC<ProgramModalProps> = ({ isOpen, onClose, program, m
                   <button
                     type="submit"
                     className="btn-primary"
+                    disabled={loading}
                   >
-                    {program ? 'Save Changes' : 'Create Program'}
+                    {loading ? (
+                      <>
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        {program ? 'Saving...' : 'Creating...'}
+                      </>
+                    ) : (
+                      program ? 'Save Changes' : 'Create Program'
+                    )}
                   </button>
                 </div>
               )}

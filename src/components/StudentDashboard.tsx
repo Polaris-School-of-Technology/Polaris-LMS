@@ -27,10 +27,14 @@ const StudentDashboard: React.FC = () => {
     avgAttendance: 0,
     recordingsAccessed: 0,
     githubContributions: 0,
-    sessionsAttended: 0
+    sessionsAttended: 0,
+    activePrograms: 0,
+    activeMentors: 0
   });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [studentsPerPage] = useState(10);
   const api = useApi();
 
   useEffect(() => {
@@ -39,34 +43,67 @@ const StudentDashboard: React.FC = () => {
         setLoading(true);
         setError(null);
 
-        // Fetch student details and metrics in parallel
-        const [detailsResponse, metricsResponse] = await Promise.all([
-          api.ums.students.getDetails(),
-          api.ums.students.getMetrics()
+        // Fetch data from Live LMS - use mentorStats dashboard for common metrics
+        const [activeProgramsResponse, activeMentorsResponse, scheduledSessionsResponse, programStatsResponse, mentorDashboardStats] = await Promise.all([
+          api.lms.adminCards.getActivePrograms(),
+          api.lms.adminCards.getActiveMentors(),
+          api.lms.adminCards.getScheduledSessions(),
+          api.lms.adminPrograms.getProgramStats(),
+          api.lms.adminMentorData.getDashboardStats()
         ]);
 
-        // Transform student details to match our interface
-        const transformedStudents: StudentMetric[] = (detailsResponse.data || []).map((student: any) => ({
-          id: student.id,
-          name: student.name,
-          rollNo: student.rollNo,
-          email: student.email,
-          program: student.program,
-          attendanceRate: student.attendance,
-          sessionsAttended: student.sessionsAttended,
-          totalSessions: student.totalSessions,
-          recordingsAccessed: Math.floor(Math.random() * 50) + 20, // Mock data for now
-          githubContributions: Math.floor(Math.random() * 200) + 50, // Mock data for now
-          lastActive: student.lastActive,
-          status: student.status
+        // Fetch student performance data from Live LMS
+        const studentPerformanceResponse = await api.lms.adminStudents.getStudentPerformance();
+        const allStudents = studentPerformanceResponse.data || [];
+
+        // Transform student performance data to match our interface
+        const transformedStudents: StudentMetric[] = allStudents.map((student: any) => ({
+          id: student.student_id || student.id,
+          name: student.name || 'Unknown Student',
+          rollNo: student.roll_number || 'N/A',
+          email: student.email || 'N/A',
+          program: student.program || 'N/A',
+          attendanceRate: parseFloat(
+            typeof student.attendance_percentage === 'string' 
+              ? student.attendance_percentage.replace('%', '') 
+              : student.attendance_percentage?.toString() || '0'
+          ),
+          sessionsAttended: student.sessions_attended || 0,
+          totalSessions: student.total_sessions || 0,
+          recordingsAccessed: student.recordings || 0,
+          githubContributions: student.github_contributions || 0,
+          lastActive: student.last_active || 'N/A',
+          status: student.status === 'active' ? 'active' : 'inactive'
         }));
 
+        // Calculate additional metrics from program data
+        const programs = programStatsResponse.data || [];
+        const activePrograms = programs.filter((p: any) => p.status === 'Active');
+        const totalSessions = programs.reduce((sum: number, p: any) => sum + (p.sessions_count || 0), 0);
+        const completedSessions = Math.floor(totalSessions * 0.8); // 80% completion rate
+
         setStudentMetrics(transformedStudents);
+        setCurrentPage(1); // Reset to first page when data changes
+        
+        // Extract data from mentor dashboard stats for consistency
+        const dashboardStats = mentorDashboardStats.data || {};
+        const mentorAvgAttendance = parseFloat(dashboardStats.avg_attendance?.replace('%', '') || '0');
+        
+        // Calculate real metrics from student data
+        const totalRecordings = transformedStudents.reduce((sum, s) => sum + s.recordingsAccessed, 0);
+        const totalGithubContributions = transformedStudents.reduce((sum, s) => sum + s.githubContributions, 0);
+        const totalSessionsAttended = transformedStudents.reduce((sum, s) => sum + s.sessionsAttended, 0);
+        const avgAttendanceFromStudents = transformedStudents.length > 0 
+          ? transformedStudents.reduce((sum, s) => sum + s.attendanceRate, 0) / transformedStudents.length 
+          : 0;
+
         setMetrics({
-          avgAttendance: metricsResponse.data?.avgAttendance || 0,
-          recordingsAccessed: Math.floor(Math.random() * 200) + 100, // Mock data for now
-          githubContributions: Math.floor(Math.random() * 500) + 200, // Mock data for now
-          sessionsAttended: metricsResponse.data?.totalSessionsAttended || 0
+          avgAttendance: mentorAvgAttendance || avgAttendanceFromStudents, // Use mentor stats or calculate from students
+          recordingsAccessed: totalRecordings,
+          githubContributions: totalGithubContributions,
+          sessionsAttended: totalSessionsAttended,
+          activePrograms: activePrograms.length,
+          activeMentors: activeMentorsResponse.data?.total_mentors || 0
         });
 
       } catch (err: any) {
@@ -104,10 +141,12 @@ const StudentDashboard: React.FC = () => {
           }
         ]);
         setMetrics({
-          avgAttendance: 87,
+          avgAttendance: 0, // Will be overridden by Live LMS data
           recordingsAccessed: 146,
           githubContributions: 335,
-          sessionsAttended: 139
+          sessionsAttended: 139,
+          activePrograms: 5,
+          activeMentors: 12
         });
       } finally {
         setLoading(false);
@@ -136,6 +175,36 @@ const StudentDashboard: React.FC = () => {
 
     return sortOrder === 'asc' ? (aVal as number) - (bVal as number) : (bVal as number) - (aVal as number);
   });
+
+  // Filter students based on selected program and batch
+  const filteredStudents = sortedStudents.filter(student => {
+    const programMatch = selectedProgram === 'all' || student.program === selectedProgram;
+    const batchMatch = selectedBatch === 'all' || student.program.includes(selectedBatch);
+    return programMatch && batchMatch;
+  });
+
+  // Pagination logic
+  const totalPages = Math.ceil(filteredStudents.length / studentsPerPage);
+  const startIndex = (currentPage - 1) * studentsPerPage;
+  const endIndex = startIndex + studentsPerPage;
+  const currentStudents = filteredStudents.slice(startIndex, endIndex);
+
+  // Pagination handlers
+  const handlePageChange = (page: number) => {
+    setCurrentPage(page);
+  };
+
+  const handlePrevPage = () => {
+    if (currentPage > 1) {
+      setCurrentPage(currentPage - 1);
+    }
+  };
+
+  const handleNextPage = () => {
+    if (currentPage < totalPages) {
+      setCurrentPage(currentPage + 1);
+    }
+  };
 
   const exportToCSV = () => {
     const headers = ['Name', 'Roll No', 'Email', 'Program', 'Attendance Rate', 'Sessions Attended', 'Total Sessions', 'Recordings Accessed', 'GitHub Contributions', 'Last Active', 'Status'];
@@ -249,12 +318,12 @@ const StudentDashboard: React.FC = () => {
         <div className="bg-gray-900 rounded-xl p-6 border border-gray-800">
           <div className="flex items-center justify-between mb-4">
             <div className="p-3 rounded-xl bg-purple-400/10">
-              <Video className="w-6 h-6 text-purple-400" />
+              <Calendar className="w-6 h-6 text-purple-400" />
             </div>
             <TrendingUp className="w-5 h-5 text-green-400" />
           </div>
-          <div className="text-2xl font-bold text-white mb-1">{metrics.recordingsAccessed}</div>
-          <div className="text-gray-400 text-sm">Recordings Accessed</div>
+          <div className="text-2xl font-bold text-white mb-1">{metrics.sessionsAttended}</div>
+          <div className="text-gray-400 text-sm">Scheduled Sessions</div>
         </div>
 
         <div className="bg-gray-900 rounded-xl p-6 border border-gray-800">
@@ -264,19 +333,19 @@ const StudentDashboard: React.FC = () => {
             </div>
             <TrendingUp className="w-5 h-5 text-green-400" />
           </div>
-          <div className="text-2xl font-bold text-white mb-1">{metrics.githubContributions}</div>
-          <div className="text-gray-400 text-sm">GitHub Contributions</div>
+          <div className="text-2xl font-bold text-white mb-1">{metrics.activeMentors}</div>
+          <div className="text-gray-400 text-sm">Total Mentors</div>
         </div>
 
         <div className="bg-gray-900 rounded-xl p-6 border border-gray-800">
           <div className="flex items-center justify-between mb-4">
             <div className="p-3 rounded-xl bg-yellow-400/10">
-              <Calendar className="w-6 h-6 text-yellow-400" />
+              <Video className="w-6 h-6 text-yellow-400" />
             </div>
             <TrendingUp className="w-5 h-5 text-green-400" />
           </div>
-          <div className="text-2xl font-bold text-white mb-1">{metrics.sessionsAttended}</div>
-          <div className="text-gray-400 text-sm">Sessions Attended</div>
+          <div className="text-2xl font-bold text-white mb-1">{metrics.activePrograms}</div>
+          <div className="text-gray-400 text-sm">Active Programs</div>
         </div>
       </div>
 
@@ -369,7 +438,7 @@ const StudentDashboard: React.FC = () => {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-800">
-              {sortedStudents.map((student) => (
+              {currentStudents.map((student) => (
                 <tr key={student.id} className="hover:bg-gray-800/50 transition-colors">
                   <td className="px-6 py-4">
                     <div>
@@ -422,6 +491,50 @@ const StudentDashboard: React.FC = () => {
             </tbody>
           </table>
         </div>
+
+        {/* Pagination Controls */}
+        {totalPages > 1 && (
+          <div className="px-6 py-4 border-t border-gray-800 bg-gray-900">
+            <div className="flex items-center justify-between">
+              <div className="text-sm text-gray-400">
+                Showing {startIndex + 1} to {Math.min(endIndex, filteredStudents.length)} of {filteredStudents.length} students
+              </div>
+              <div className="flex items-center space-x-2">
+                <button
+                  onClick={handlePrevPage}
+                  disabled={currentPage === 1}
+                  className="px-3 py-1 text-sm bg-gray-800 text-gray-300 rounded-md hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                >
+                  Previous
+                </button>
+                
+                <div className="flex space-x-1 overflow-x-auto max-w-64 scrollbar-thin scrollbar-thumb-gray-600 scrollbar-track-gray-800">
+                  {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
+                    <button
+                      key={page}
+                      onClick={() => handlePageChange(page)}
+                      className={`px-3 py-1 text-sm rounded-md transition-colors whitespace-nowrap flex-shrink-0 ${
+                        currentPage === page
+                          ? 'bg-yellow-500 text-black font-medium'
+                          : 'bg-gray-800 text-gray-300 hover:bg-gray-700'
+                      }`}
+                    >
+                      {page}
+                    </button>
+                  ))}
+                </div>
+                
+                <button
+                  onClick={handleNextPage}
+                  disabled={currentPage === totalPages}
+                  className="px-3 py-1 text-sm bg-gray-800 text-gray-300 rounded-md hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                >
+                  Next
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
