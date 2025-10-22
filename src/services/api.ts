@@ -3,7 +3,7 @@ import { useMemo } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 
 // Base URLs for different services
-const UMS_BASE_URL = import.meta.env.UMS_BASE_URL || '/ums'; // User Management System
+const UMS_BASE_URL = import.meta.env.UMS_BASE_URL || 'https://ums-672553132888.asia-south1.run.app'; // User Management System
 const LMS_BASE_URL = import.meta.env.LMS_BASE_URL || 'https://live-class-lms1-672553132888.asia-south1.run.app'; // Live Class LMS Backend  
 
 // Token storage and refresh functionality
