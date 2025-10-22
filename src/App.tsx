@@ -56,7 +56,7 @@ const AppRoutes: React.FC = () => {
   return (
     <Routes>
       {/* Public Routes */}
-      <Route path="/" element={<StudentPageWithAuth />} />
+      <Route path="/" element={<AdminPageWithAuth />} />
       <Route path="/admin" element={<AdminPageWithAuth />} />
       <Route path="/faculty" element={<FacultyPageWithAuth />} />
 
