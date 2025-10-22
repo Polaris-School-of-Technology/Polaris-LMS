@@ -30,8 +30,14 @@ const ProgramModal: React.FC<ProgramModalProps> = ({ isOpen, onClose, program, m
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
   const [reschedules, setReschedules] = useState<any[]>([]);
   const [loadingReschedules, setLoadingReschedules] = useState(false);
-  const [batches, setBatches] = useState<Array<{id: number, batch_name: string, academic_year: string, semester: number}>>([]);
-  const [faculties, setFaculties] = useState<Array<{user_id: string, name: string}>>([]);
+  const [batches, setBatches] = useState<Array<{ id: number, batch_name: string, academic_year: string, semester: number }>>([]);
+  const [faculties, setFaculties] = useState<Array<{
+    user_id: string;
+    profiles: { name: string };
+    expertise: string[] | null;
+    date_of_joining: string | null;
+    is_active: boolean;
+  }>>([]);
   const [selectedBatchId, setSelectedBatchId] = useState<number>(1);
   const [selectedFacultyId, setSelectedFacultyId] = useState<string>('');
   const [loading, setLoading] = useState(false);
@@ -69,14 +75,14 @@ const ProgramModal: React.FC<ProgramModalProps> = ({ isOpen, onClose, program, m
             api.lms.adminMentors.getAllBatches(),
             api.lms.adminPrograms.getAllFaculties()
           ]);
-          
+
           if (batchesResponse.batches) {
             setBatches(batchesResponse.batches);
             if (batchesResponse.batches.length > 0) {
               setSelectedBatchId(batchesResponse.batches[0].id);
             }
           }
-          
+
           if (facultiesResponse.faculties) {
             setFaculties(facultiesResponse.faculties);
             if (facultiesResponse.faculties.length > 0) {
@@ -203,14 +209,14 @@ const ProgramModal: React.FC<ProgramModalProps> = ({ isOpen, onClose, program, m
   }, {} as Record<string, number>);
 
   const topRescheduler = Object.entries(mentorRescheduleCounts)
-    .sort(([,a], [,b]) => b - a)[0];
+    .sort(([, a], [, b]) => b - a)[0];
 
   const handleSave = async () => {
     if (mode === 'edit' && !program) {
       // Creating a new program
       try {
         setLoading(true);
-        
+
         if (faculties.length === 0) {
           alert('No faculties available. Please add a faculty first.');
           return;
@@ -234,7 +240,7 @@ const ProgramModal: React.FC<ProgramModalProps> = ({ isOpen, onClose, program, m
         };
 
         const result = await api.lms.adminPrograms.createProgram(programData);
-        
+
         if (result.message === 'Course created successfully.') {
           alert('Program created successfully!');
           onClose();
@@ -384,7 +390,7 @@ const ProgramModal: React.FC<ProgramModalProps> = ({ isOpen, onClose, program, m
                       <option value="">{loading ? 'Loading faculties...' : 'Select Faculty'}</option>
                       {faculties.map((faculty) => (
                         <option key={faculty.user_id} value={faculty.user_id}>
-                          {faculty.name}
+                          {faculty.profiles?.name || 'Unknown Faculty'}
                         </option>
                       ))}
                     </select>
@@ -486,11 +492,10 @@ const ProgramModal: React.FC<ProgramModalProps> = ({ isOpen, onClose, program, m
                   </label>
                   {mode === 'view' ? (
                     <div className="h-12 flex items-center px-4 bg-gray-800 rounded-lg">
-                      <span className={`inline-flex px-3 py-1 text-xs font-medium rounded-full ${
-                        program?.status === 'active' ? 'text-green-400 bg-green-400/10' :
+                      <span className={`inline-flex px-3 py-1 text-xs font-medium rounded-full ${program?.status === 'active' ? 'text-green-400 bg-green-400/10' :
                         program?.status === 'completed' ? 'text-yellow-400 bg-yellow-400/10' :
-                        'text-gray-400 bg-gray-400/10'
-                      }`}>
+                          'text-gray-400 bg-gray-400/10'
+                        }`}>
                         {program?.status ? program.status.charAt(0).toUpperCase() + program.status.slice(1) : 'N/A'}
                       </span>
                     </div>
@@ -728,11 +733,10 @@ const ProgramModal: React.FC<ProgramModalProps> = ({ isOpen, onClose, program, m
                                   </div>
                                 </td>
                                 <td className="px-4 py-3">
-                                  <span className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${
-                                    reschedule.rescheduleCount >= 3 ? 'text-red-400 bg-red-400/10' :
+                                  <span className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${reschedule.rescheduleCount >= 3 ? 'text-red-400 bg-red-400/10' :
                                     reschedule.rescheduleCount >= 2 ? 'text-yellow-400 bg-yellow-400/10' :
-                                    'text-green-400 bg-green-400/10'
-                                  }`}>
+                                      'text-green-400 bg-green-400/10'
+                                    }`}>
                                     {reschedule.rescheduleCount}
                                   </span>
                                 </td>
