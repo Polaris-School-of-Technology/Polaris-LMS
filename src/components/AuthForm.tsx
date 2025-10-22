@@ -62,7 +62,7 @@ const AuthForm: React.FC<AuthFormProps> = ({ userType, onLogin }) => {
       }
 
 
-      const response = await fetch(`/ums/api/auth${endpoint}`, {
+      const response = await fetch(`https://ums-672553132888.asia-south1.run.app/ums/api/auth${endpoint}`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -116,7 +116,7 @@ const AuthForm: React.FC<AuthFormProps> = ({ userType, onLogin }) => {
           break;
       }
 
-      const response = await fetch(`/ums/api/auth${endpoint}`, {
+      const response = await fetch(`https://ums-672553132888.asia-south1.run.app/ums/api/auth${endpoint}`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -176,7 +176,7 @@ const AuthForm: React.FC<AuthFormProps> = ({ userType, onLogin }) => {
           return;
       }
 
-      const response = await fetch(`/ums/api/auth${endpoint}`, {
+      const response = await fetch(`https://ums-672553132888.asia-south1.run.app/ums/api/auth${endpoint}`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
