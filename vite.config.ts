@@ -7,7 +7,7 @@ export default defineConfig({
   server: {
     proxy: {
       '/ums': {
-        target: 'http://localhost:10000',
+        target: 'https://ums-672553132888.asia-south1.run.app',
         changeOrigin: true
       }
     }
