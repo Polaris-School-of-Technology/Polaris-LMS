@@ -27,28 +27,28 @@ export default function MentorTable({ onViewMentor, onEditMentor, onAddMentor }:
         setLoading(true);
         setError(null);
 
-        const response = await api.lms.mentors.getAll();
+       const response = await api.lms.mentors.getAll();
+        const data = response.faculties || [];
 
-        if (!isMounted) return; // Prevent state update if component unmounted
+const transformedMentors: Mentor[] = data.map((faculty: any) => ({
+  id: faculty.user_id,
+  name: faculty.profiles.name || faculty.full_name || faculty.username || 'Unknown',
+  email: faculty.email || 'N/A',
+  program: faculty.department || 'N/A',
+  students: [],
+  batch: faculty.title || 'N/A',
+  maxStudents: 10,
+  joinDate: faculty.created_at ? new Date(faculty.created_at).toISOString().split('T')[0] : 'N/A',
+  expertise: faculty.expertise || [],
+  sessionsCompleted: faculty.sessions_completed || 0,
+  sessionsRescheduled: faculty.sessions_rescheduled || 0,
+  sessionsCancelled: faculty.sessions_cancelled || 0,
+  rating: faculty.rating || 0,
+  status: faculty.is_active ? 'active' : 'inactive'
+}));
 
-        // Transform the API response to match our Mentor interface
-        const transformedMentors: Mentor[] = response.map((mentor: any) => ({
-          id: mentor.id || mentor.user_id,
-          name: mentor.name || mentor.full_name || 'Unknown',
-          email: mentor.email || 'N/A',
-          program: mentor.program || mentor.course_name || 'N/A',
-          students: mentor.students || [],
-          batch: mentor.batch || mentor.batch_name || 'N/A',
-          maxStudents: mentor.max_students || 10,
-          joinDate: mentor.join_date || mentor.created_at || 'N/A',
-          expertise: mentor.expertise || mentor.skills || [],
-          sessionsCompleted: mentor.sessions_completed || 0,
-          sessionsRescheduled: mentor.sessions_rescheduled || 0,
-          sessionsCancelled: mentor.sessions_cancelled || 0,
-          rating: mentor.rating || 0,
-          status: mentor.status || mentor.is_active ? 'active' : 'inactive'
-        }));
-
+setMentorData(transformedMentors);
+        console.log(transformedMentors);
         setMentorData(transformedMentors);
       } catch (err: any) {
 
@@ -199,7 +199,7 @@ export default function MentorTable({ onViewMentor, onEditMentor, onAddMentor }:
   const toggleDropdown = (mentorId: string) => {
     setActiveDropdown(activeDropdown === mentorId ? null : mentorId);
   };
-
+  console.log(sortedMentors);
   if (loading) {
     return (
       <div className="bg-gray-900/50 backdrop-blur-sm rounded-2xl border border-gray-800/50 overflow-hidden">
@@ -232,7 +232,7 @@ export default function MentorTable({ onViewMentor, onEditMentor, onAddMentor }:
       </div>
     );
   }
-
+  
   return (
     <div className="bg-gray-900/50 backdrop-blur-sm rounded-2xl border border-gray-800/50 overflow-hidden">
       <div className="p-6 border-b border-gray-800/50">
