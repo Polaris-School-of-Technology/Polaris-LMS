@@ -11,16 +11,34 @@ interface ProgramModalProps {
 }
 
 const ProgramModal: React.FC<ProgramModalProps> = ({ isOpen, onClose, program, mode }) => {
-  const [editData, setEditData] = useState(program || {
-    id: '',
-    name: '',
-    cohort: '',
-    sessions: 0,
-    status: 'active' as Program['status'],
-    startDate: '',
-    endDate: '',
-    assignedMentor: null
-  });
+  
+  const [editData, setEditData] = useState<Partial<Program>>({
+  id: '',
+  name: '',
+  cohort: '',
+  sessions: 0,
+  status: 'active',
+  startDate: '',
+  endDate: '',
+  assignedMentor: null
+});
+
+useEffect(() => {
+  if (program) {
+    setEditData(program);
+  } else {
+    setEditData({
+      id: '',
+      name: '',
+      cohort: '',
+      sessions: 0,
+      status: 'active',
+      startDate: '',
+      endDate: '',
+      assignedMentor: null
+    });
+  }
+}, [program, isOpen]);
 
   const [showMentorDropdown, setShowMentorDropdown] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
@@ -42,7 +60,6 @@ const ProgramModal: React.FC<ProgramModalProps> = ({ isOpen, onClose, program, m
   const [selectedFacultyId, setSelectedFacultyId] = useState<string>('');
   const [loading, setLoading] = useState(false);
   const api = useApi();
-
   // Fetch reschedule data when modal opens and program is selected
   useEffect(() => {
     if (isOpen && program && mode === 'view') {
@@ -331,6 +348,7 @@ const ProgramModal: React.FC<ProgramModalProps> = ({ isOpen, onClose, program, m
                       placeholder="Enter program name"
                       required
                     />
+                    
                   )}
                 </div>
 
