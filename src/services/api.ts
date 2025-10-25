@@ -356,6 +356,11 @@ const lmsApi = {
         method: 'GET',
       }, token);
     },
+    getStudentDetails: async (page: number = 1, limit: number = 20, token: string) => {
+      return lmsApiRequest(`${LMS_BASE_URL}/api/v1/admin/students/performance?page=${page}&limit=${limit}`, {
+        method: 'GET',
+      }, token);
+    },
 
     getDashboardCards: async (token: string) => {
       try {
@@ -766,7 +771,7 @@ export const useApi = () => {
       students: {
         getAll: (page: number = 1, limit: number = 20) => umsApi.students.getAll(page, limit, token),
         getMetrics: () => umsApi.students.getMetrics(token),
-        getDetails: (page: number = 1, limit: number = 20) => umsApi.students.getDetails(page, limit, token),
+        getDetails: (page: number = 1, limit: number = 20) => lmsApi.students.getStudentDetails(page, limit, token),
         getAttendanceHistory: (studentId: string) => umsApi.students.getAttendanceHistory(studentId, token),
         bulkEnroll: (file: File, batchId: number) => umsApi.students.bulkEnroll(file, batchId, token),
       },
@@ -798,6 +803,7 @@ export const useApi = () => {
       students: {
         getAll: () => lmsApi.students.getAll(token),
         getDashboardCards: () => lmsApi.students.getDashboardCards(token),
+        getStudentDetails: (page: number, limit: number) => lmsApi.adminStudents.getStudentDetails(page, limit, token),
       },
       mentors: {
         getAll: () => lmsApi.mentors.getAll(token),

@@ -37,20 +37,20 @@ const StudentTable: React.FC<StudentTableProps> = ({ onViewStudent, onEditStuden
 
         // Transform the API response to match our Student interface
         const transformedStudents: Student[] = (response.data || []).map((student: any) => ({
-          id: student.id,
+          id: student.student_id,
           name: student.name || 'Unknown',
-          rollNo: student.rollNo || 'N/A',
+          rollNo: student.roll_number || 'N/A',
           email: student.email || 'N/A',
-          batch: student.batch || 'N/A',
+          batch: student.batch_name || 'N/A',
           program: student.program || 'N/A',
-          mentorGroup: 'Not Assigned', // This would need to be added to the backend
-          attendance: student.attendance || 0,
+          mentorGroup: student.group_name, // This would need to be added to the backend
+          attendance: student.attendance_percentage || 0,
           status: student.status || 'inactive',
           joinDate: student.joinDate || 'N/A'
         }));
 
         setStudents(transformedStudents);
-
+        
         // Update pagination info
         if (response.pagination) {
           setTotalPages(response.pagination.totalPages);
@@ -60,7 +60,7 @@ const StudentTable: React.FC<StudentTableProps> = ({ onViewStudent, onEditStuden
         }
       } catch (err: any) {
         setError(err.message || 'Failed to load students');
-
+        
         // Fallback to mock data if API fails
         setStudents([
           {
@@ -146,7 +146,7 @@ const StudentTable: React.FC<StudentTableProps> = ({ onViewStudent, onEditStuden
         return aVal > bVal ? -1 : aVal < bVal ? 1 : 0;
       }
     });
-
+    
   const getStatusColor = (status: Student['status']) => {
     switch (status) {
       case 'active': return 'text-green-400 bg-green-400/10';
@@ -178,7 +178,7 @@ const StudentTable: React.FC<StudentTableProps> = ({ onViewStudent, onEditStuden
       setCurrentPage(currentPage - 1);
     }
   };
-
+  
   if (loading) {
     return (
       <div className="bg-gray-900 rounded-lg border border-gray-800 overflow-hidden">
@@ -194,7 +194,7 @@ const StudentTable: React.FC<StudentTableProps> = ({ onViewStudent, onEditStuden
       </div>
     );
   }
-
+  
   if (error) {
     return (
       <div className="bg-gray-900 rounded-lg border border-gray-800 overflow-hidden">
