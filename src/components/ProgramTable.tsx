@@ -26,7 +26,7 @@ const ProgramTable: React.FC<ProgramTableProps> = ({ onViewProgram, onEditProgra
 
         // Get programs from Live LMS backend
         const programsData = await api.lms.adminPrograms.getProgramStats();
-
+        
         // Transform the data to match our Program interface
         const transformedPrograms: Program[] = programsData.data.map((program: any, index: number) => {
           return {
@@ -270,6 +270,7 @@ const ProgramTable: React.FC<ProgramTableProps> = ({ onViewProgram, onEditProgra
                       }}
                       className="p-1 text-gray-400 hover:text-yellow-500 transition-colors"
                     >
+                      
                       <Edit className="w-4 h-4" />
                     </button>
                     <button 

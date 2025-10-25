@@ -72,6 +72,7 @@ const ProgramDashboard: React.FC = () => {
         };
 
         setMetrics(metricsData);
+        
       } catch (err: any) {
         setError(err.message || 'Failed to load program metrics');
 
@@ -113,7 +114,8 @@ const ProgramDashboard: React.FC = () => {
       }));
 
       setProgramMentors(programMentors);
-
+      
+      
       // Fetch students performance data from Live LMS
       const studentsResponse = await api.lms.adminStudents.getStudentPerformance();
       const allStudents = studentsResponse.data || [];
