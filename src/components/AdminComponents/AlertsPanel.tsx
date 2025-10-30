@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { AlertTriangle, UserX, VideoOff, Bell, X, Eye, Settings, AlertCircle, Loader2 } from 'lucide-react';
-import { useApi } from '../services/api';
+import { useApi } from '../../services/AdminServices/api';
 
 interface Alert {
   id: string;

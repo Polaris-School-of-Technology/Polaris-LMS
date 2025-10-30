@@ -1,6 +1,6 @@
 // API service layer to connect with all three backends
 import { useMemo } from 'react';
-import { useAuth } from '../contexts/AuthContext';
+import { useAuth } from '../../contexts/AdminContext/AuthContext';
 
 // Base URLs for different services
 const UMS_BASE_URL = import.meta.env.VITE_UMS_BASE_URL || 'https://ums-672553132888.asia-south1.run.app'; // User Management System

@@ -1,5 +1,5 @@
 import React from 'react';
-import AuthForm from '../components/AuthForm';
+import AuthForm from '../../components/AdminComponents/AuthForm';
 
 interface FacultyPageProps {
   onLogin: (user: any, token: string) => void;

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Search, MoreVertical, Eye, CreditCard as Edit, UserX, Loader2, AlertCircle } from 'lucide-react';
-import type { Mentor, Student } from '../types';
-import { useApi } from '../services/api';
+import type { Mentor, Student } from '../../types/AdminTypes';
+import { useApi } from '../../services/AdminServices/api';
 
 interface MentorTableProps {
   onViewMentor: (mentor: Mentor) => void;

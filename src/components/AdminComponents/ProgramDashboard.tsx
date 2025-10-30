@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { Calendar, Clock, Video, Users, TrendingUp, BarChart3, Play, CheckCircle, Loader2, AlertCircle, X, Eye, BookOpen, User, GraduationCap } from 'lucide-react';
-import { useApi } from '../services/api';
-import { useAuth } from '../contexts/AuthContext';
+import { useApi } from '../../services/AdminServices/api';
+import { useAuth } from '../../contexts/AdminContext/AuthContext';
 import ProgramTable from './ProgramTable';
-import type { Program } from '../types';
+import type { Program } from '../../types/AdminTypes';
 
 const ProgramDashboard: React.FC = () => {
   const [selectedProgram, setSelectedProgram] = useState('all');

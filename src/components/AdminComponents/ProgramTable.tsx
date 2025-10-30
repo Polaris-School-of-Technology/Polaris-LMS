@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Search, Eye, CreditCard as Edit, MoreVertical, ArrowUpDown, Filter, Loader2, AlertCircle } from 'lucide-react';
-import type { Program } from '../types';
-import { useApi } from '../services/api';
+import type { Program } from '../../types/AdminTypes';
+import { useApi } from '../../services/AdminServices/api';
 
 interface ProgramTableProps {
   onViewProgram: (program: Program) => void;

@@ -1,5 +1,7 @@
 import React from 'react';
-import AuthForm from '../components/AuthForm';
+import AuthForm from '../../components/AdminComponents/AuthForm';
+
+// /Users/admin/Desktop/Polaris-LMS/src/components/AdminComponents/AuthForm.tsx
 
 interface AdminPageProps {
   onLogin: (user: any, token: string) => void;

@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Search, Eye, CreditCard as Edit, MoreVertical, ArrowUpDown, Filter, Loader2, AlertCircle } from 'lucide-react';
-import type { Group } from '../types';
-import { useApi } from '../services/api';
+import type { Group } from '../../types/AdminTypes';
+import { useApi } from '../../services/AdminServices/api';
 
 interface GroupTableProps {
   onViewGroup: (group: Group) => void;

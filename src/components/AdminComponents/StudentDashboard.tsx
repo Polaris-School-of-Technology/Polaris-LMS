@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Calendar, Video, Github, TrendingUp, Eye, Download, BarChart3, Loader2, AlertCircle, ChevronLeft, ChevronRight } from 'lucide-react';
-import { useApi } from '../services/api';
+import { useApi } from '../../services/AdminServices/api';
 
 interface StudentMetric {
   id: string;

@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { TrendingUp, TrendingDown, Users, PlayCircle, Calendar, BarChart, Loader2 } from 'lucide-react';
-import type { KPI } from '../types';
-import { useApi } from '../services/api';
-import { useAuth } from '../contexts/AuthContext';
+import type { KPI } from '../../types/AdminTypes';
+import { useApi } from '../../services/AdminServices/api';
+import { useAuth } from '../../contexts/AdminContext/AuthContext';
 
 const SummaryCards: React.FC = () => {
   const [kpis, setKpis] = useState<KPI[]>([]);

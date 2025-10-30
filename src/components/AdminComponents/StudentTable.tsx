@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { Search, Eye, CreditCard as Edit, MoreVertical, ArrowUpDown, Filter, UserPlus, Loader2, AlertCircle, ChevronLeft, ChevronRight, Upload } from 'lucide-react';
-import type { Student } from '../types';
-import { useApi } from '../services/api';
-import { useAuth } from '../contexts/AuthContext';
+import type { Student } from '../../types/AdminTypes';
+import { useApi } from '../../services/AdminServices/api';
+import { useAuth } from '../../contexts/AdminContext/AuthContext';
 import BulkUploadModal from './BulkUploadModal';
 
 interface StudentTableProps {

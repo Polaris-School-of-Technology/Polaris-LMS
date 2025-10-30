@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { X, Users, BookOpen, Calendar, Clock, AlertTriangle, Filter, ArrowUpDown, Loader2 } from 'lucide-react';
-import type { Program } from '../types';
-import { useApi } from '../services/api';
+import type { Program } from '../../types/AdminTypes';
+import { useApi } from '../../services/AdminServices/api';
 
 interface ProgramModalProps {
   isOpen: boolean;

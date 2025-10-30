@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { User, Mail, BookOpen, Users, Calendar, Star, Award, TrendingUp, UserX, AlertTriangle, Clock, Loader2 } from 'lucide-react';
-import type { Mentor } from '../types';
+import type { Mentor } from '../../types/AdminTypes';
 import Modal from './Modal';
-import { useApi } from '../services/api';
+import { useApi } from '../../services/AdminServices/api';
 
 interface MentorModalProps {
   isOpen: boolean;

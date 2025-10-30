@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Bell, User, ChevronDown, Settings, LogOut, Search } from 'lucide-react';
-import { useAuth } from '../contexts/AuthContext';
+import { useAuth } from '../../contexts/AdminContext/AuthContext';
 
 interface NavbarProps {
   notifications: number;

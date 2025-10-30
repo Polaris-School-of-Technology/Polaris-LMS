@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Download, Eye, MoreVertical, TrendingUp, Clock, Users, Video, Calendar, UserX, Loader2 } from 'lucide-react';
-import { useApi } from '../services/api';
-import { useAuth } from '../contexts/AuthContext';
+import { useApi } from '../../services/AdminServices/api';
+import { useAuth } from '../../contexts/AdminContext/AuthContext';
 
 interface MentorMetric {
   id: string;

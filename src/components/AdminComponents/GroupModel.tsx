@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { X, Loader2 } from 'lucide-react';
-import { useApi } from '../services/api';
-import type { Group } from '../types'; 
+import { useApi } from '../../services/AdminServices/api';
+import type { Group } from '../../types/AdminTypes';
 
 interface GroupModalProps {
   isOpen: boolean;

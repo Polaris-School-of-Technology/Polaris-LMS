@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Upload, FileText, Users, AlertCircle, CheckCircle, Loader2, X } from 'lucide-react';
-import { useApi } from '../services/api';
+import { useApi } from '../../services/AdminServices/api';
 
 interface BulkUploadModalProps {
   isOpen: boolean;

@@ -1,7 +1,7 @@
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
-import { AuthProvider, useAuth } from './contexts/AuthContext';
-import { StudentPage, FacultyPage, AdminPage, Dashboard } from './pages';
+import { AuthProvider, useAuth } from './contexts/AdminContext/AuthContext';
+import { StudentPage, FacultyPage, AdminPage, Dashboard } from './pages/AdminPages';
 
 const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { isAuthenticated, loading } = useAuth();
