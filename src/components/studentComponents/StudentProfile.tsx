@@ -1,15 +1,15 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Calendar, Video, FileText, Github, Award, Clock, User, Users, BookOpen, PlayCircle, CheckCircle, AlertCircle, Upload, File, X, Mail, Phone, Briefcase, LogOut, ChevronDown, Settings } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
+import { useApi } from '../../services/api';
 
 interface UpcomingClass {
-  id: string;
-  title: string;
-  mentor: string;
-  program: string;
-  date: string;
-  time: string;
-  duration: string;
+  session_id: number;
+  course_name: string;
+  faculty_name: string;
+  session_datetime: string;
+  duration: number;
+  venue: string;
   status: 'upcoming' | 'live' | 'completed';
   rescheduled?: boolean;
   originalDate?: string;
@@ -62,12 +62,15 @@ interface MentorInfo {
 
 const StudentProfile = () => {
   const { logout, user } = useAuth();
+  const api = useApi();
   const [activeTab, setActiveTab] = useState<'overview' | 'schedule' | 'recordings' | 'assignments' | 'contributions'>('overview');
   const [showUploadModal, setShowUploadModal] = useState(false);
   const [showProfileMenu, setShowProfileMenu] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [selectedProgram, setSelectedProgram] = useState('React.js');
   const [selectedFileType, setSelectedFileType] = useState('Assignment');
+  const [upcomingClasses, setUpcomingClasses] = useState<UpcomingClass[]>([]);
+  const [loading, setLoading] = useState(true);
   const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([
     {
       id: '1',
@@ -86,6 +89,73 @@ const StudentProfile = () => {
       program: 'Node.js',
     },
   ]);
+
+  useEffect(() => {
+    fetchUpcomingClasses();
+  }, []);
+
+  const fetchUpcomingClasses = async () => {
+    try {
+      setLoading(true);
+      // Get token from localStorage or however your app stores it
+      const response = await api.lms.students.getClassSchedule(1, 10);
+      console.log('API Response:', response);
+      
+      if (response.success && response.data) {
+        const now = new Date(); // Get the current date and time
+        
+        // Filter for sessions that are:
+        // 1. Marked as 'upcoming' or 'live' AND
+        // 2. Have a session_datetime that is AFTER or EQUAL to the current time ('now').
+        const filteredSessions = response.data.filter(
+          (session: UpcomingClass) => {
+            const sessionDate = new Date(session.session_datetime);
+            
+            return (
+              (session.status === 'upcoming' || session.status === 'live') &&
+              sessionDate.getTime() >= now.getTime() // KEY CHANGE: Filter out past sessions
+            );
+          }
+        );
+        
+        // Sort by date (earliest first)
+        const sortedSessions = filteredSessions.sort((a: UpcomingClass, b: UpcomingClass) => 
+          new Date(a.session_datetime).getTime() - new Date(b.session_datetime).getTime()
+        );
+        
+        setUpcomingClasses(sortedSessions);
+      }
+    } catch (error) {
+      console.error('Error fetching upcoming classes:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const formatDate = (dateString: string) => {
+    const sessionDate = new Date(dateString);
+    const today = new Date();
+    const tomorrow = new Date(today);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+
+    // Reset time for comparison
+    today.setHours(0, 0, 0, 0);
+    tomorrow.setHours(0, 0, 0, 0);
+    sessionDate.setHours(0, 0, 0, 0);
+
+    if (sessionDate.getTime() === today.getTime()) {
+      return 'Today';
+    } else if (sessionDate.getTime() === tomorrow.getTime()) {
+      return 'Tomorrow';
+    } else {
+      return sessionDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    }
+  };
+
+  const formatTime = (dateString: string) => {
+    const date = new Date(dateString);
+    return date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
+  };
 
   const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
     if (event.target.files && event.target.files[0]) {
@@ -144,41 +214,6 @@ const StudentProfile = () => {
     totalAssignments: 20,
     githubContributions: 45,
   };
-
-  const upcomingClasses: UpcomingClass[] = [
-    {
-      id: '1',
-      title: 'Advanced React Patterns',
-      mentor: 'Sarah Mitchell',
-      program: 'React.js',
-      date: 'Today',
-      time: '2:00 PM',
-      duration: '90 min',
-      status: 'live',
-    },
-    {
-      id: '2',
-      title: 'Node.js Microservices',
-      mentor: 'James Cooper',
-      program: 'Node.js',
-      date: 'Tomorrow',
-      time: '10:00 AM',
-      duration: '120 min',
-      status: 'upcoming',
-      rescheduled: true,
-      originalDate: 'Today',
-    },
-    {
-      id: '3',
-      title: 'Python Data Structures',
-      mentor: 'Emily Zhang',
-      program: 'Python',
-      date: 'Oct 5, 2025',
-      time: '3:00 PM',
-      duration: '90 min',
-      status: 'upcoming',
-    },
-  ];
 
   const recordings: Recording[] = [
     {
@@ -259,6 +294,19 @@ const StudentProfile = () => {
     },
   ];
 
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen bg-[#0A0E1A]">
+        <div className="text-center">
+          <div className="animate-spin mb-4">
+            <Users className="h-8 w-8 text-[#FFC540] mx-auto" />
+          </div>
+          <p className="text-gray-400">Loading...</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-[#0A0E1A]">
       <nav className="bg-[#0A0E1A] border-b border-gray-800 px-8 py-4">
@@ -290,7 +338,6 @@ const StudentProfile = () => {
               </button>
             </div>
             
-            {/* Profile Menu */}
             <div className="relative">
               <button
                 onClick={() => setShowProfileMenu(!showProfileMenu)}
@@ -302,10 +349,8 @@ const StudentProfile = () => {
                 <ChevronDown className="w-4 h-4 text-gray-400" />
               </button>
 
-              {/* Dropdown Menu */}
               {showProfileMenu && (
                 <>
-                  {/* Backdrop to close dropdown */}
                   <div
                     className="fixed inset-0 z-10"
                     onClick={() => setShowProfileMenu(false)}
@@ -468,59 +513,63 @@ const StudentProfile = () => {
                       Upcoming Classes
                     </h2>
                   </div>
-                  <div className="space-y-4">
-                    {upcomingClasses.map((classItem) => (
-                      <div
-                        key={classItem.id}
-                        className="bg-[#0d1420] rounded-lg p-4 border border-gray-800 hover:border-gray-700 transition-all"
-                      >
-                        <div className="flex items-start justify-between">
-                          <div className="flex-1">
-                            <div className="flex items-center gap-2 mb-2">
-                              <h3 className="text-base font-semibold text-white">{classItem.title}</h3>
-                              {classItem.status === 'live' && (
-                                <span className="px-2 py-1 bg-red-500 text-white text-xs font-bold rounded-full animate-pulse">
-                                  LIVE
-                                </span>
-                              )}
-                              {classItem.rescheduled && (
-                                <span className="px-2 py-1 bg-[#FFC540]/20 text-[#FFC540] text-xs font-bold rounded-full border border-[#FFC540]/30">
-                                  RESCHEDULED
-                                </span>
-                              )}
-                            </div>
-                            {classItem.rescheduled && classItem.originalDate && (
-                              <div className="mb-2 text-xs text-[#FFC540]/80">
-                                Originally scheduled for {classItem.originalDate}
+                  {upcomingClasses.length === 0 ? (
+                    <p className="text-gray-400 text-center py-8">No upcoming classes scheduled</p>
+                  ) : (
+                    <div className="space-y-4">
+                      {upcomingClasses.map((classItem) => (
+                        <div
+                          key={classItem.session_id}
+                          className="bg-[#0d1420] rounded-lg p-4 border border-gray-800 hover:border-gray-700 transition-all"
+                        >
+                          <div className="flex items-start justify-between">
+                            <div className="flex-1">
+                              <div className="flex items-center gap-2 mb-2">
+                                <h3 className="text-base font-semibold text-white">{classItem.course_name}</h3>
+                                {classItem.status === 'live' && (
+                                  <span className="px-2 py-1 bg-red-500 text-white text-xs font-bold rounded-full animate-pulse">
+                                    LIVE
+                                  </span>
+                                )}
+                                {classItem.rescheduled && (
+                                  <span className="px-2 py-1 bg-[#FFC540]/20 text-[#FFC540] text-xs font-bold rounded-full border border-[#FFC540]/30">
+                                    RESCHEDULED
+                                  </span>
+                                )}
                               </div>
-                            )}
-                            <div className="flex items-center gap-4 text-sm text-gray-400">
-                              <span className="flex items-center gap-1">
-                                <Users className="w-3 h-3" />
-                                {classItem.mentor}
-                              </span>
-                              <span className="flex items-center gap-1">
-                                <BookOpen className="w-3 h-3" />
-                                {classItem.program}
-                              </span>
-                              <span className="flex items-center gap-1">
-                                <Calendar className="w-3 h-3" />
-                                {classItem.date}
-                              </span>
-                              <span className="flex items-center gap-1">
-                                <Clock className="w-3 h-3" />
-                                {classItem.time}
-                              </span>
+                              {classItem.rescheduled && classItem.originalDate && (
+                                <div className="mb-2 text-xs text-[#FFC540]/80">
+                                  Originally scheduled for {classItem.originalDate}
+                                </div>
+                              )}
+                              <div className="flex items-center gap-4 text-sm text-gray-400">
+                                <span className="flex items-center gap-1">
+                                  <Users className="w-3 h-3" />
+                                  {classItem.faculty_name}
+                                </span>
+                                <span className="flex items-center gap-1">
+                                  <Calendar className="w-3 h-3" />
+                                  {formatDate(classItem.session_datetime)}
+                                </span>
+                                <span className="flex items-center gap-1">
+                                  <Clock className="w-3 h-3" />
+                                  {formatTime(classItem.session_datetime)}
+                                </span>
+                                <span className="flex items-center gap-1">
+                                  <Clock className="w-3 h-3" />
+                                  {classItem.duration} min
+                                </span>
+                              </div>
                             </div>
+                            <button className="ml-4 px-4 py-2 bg-[#FFC540] text-black rounded-lg font-semibold hover:bg-[#e6b139] transition-all flex items-center gap-2 text-sm">
+                              <Video className="w-4 h-4" />
+                              {classItem.status === 'live' ? 'Join Now' : 'Calendar'}
+                            </button>
                           </div>
-                          <button className="ml-4 px-4 py-2 bg-[#FFC540] text-black rounded-lg font-semibold hover:bg-[#FFC540] transition-all flex items-center gap-2 text-sm">
-                            <Video className="w-4 h-4" />
-                            {classItem.status === 'live' ? 'Join Now' : 'Calendar'}
-                          </button>
                         </div>
-                      </div>
-                    ))}
-                  </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
 
                 <div className="bg-[#1a2332] rounded-xl p-6 border border-gray-800 mt-6">
@@ -584,7 +633,7 @@ const StudentProfile = () => {
                         <span className="text-xs">{mentorInfo.phone}</span>
                       </div>
                     </div>
-                    <button className="w-full px-4 py-3 bg-[#FFC540] text-black rounded-lg font-semibold hover:bg-[#FFC540] transition-all flex items-center justify-center gap-2">
+                    <button className="w-full px-4 py-3 bg-[#FFC540] text-black rounded-lg font-semibold hover:bg-[#e6b139] transition-all flex items-center justify-center gap-2">
                       <Mail className="w-4 h-4" />
                       Contact Mentor
                     </button>
@@ -670,49 +719,53 @@ const StudentProfile = () => {
         {activeTab === 'schedule' && (
           <div className="bg-[#1a2332] rounded-xl p-6 border border-gray-800">
             <h2 className="text-xl font-bold text-white mb-6">Class Schedule</h2>
-            <div className="space-y-4">
-              {upcomingClasses.map((classItem) => (
-                <div
-                  key={classItem.id}
-                  className="bg-[#0d1420] rounded-lg p-6 border border-gray-800 hover:border-gray-700 transition-all"
-                >
-                  <div className="flex items-start justify-between">
-                    <div className="flex-1">
-                      <div className="flex items-center gap-3 mb-3">
-                        <h3 className="text-lg font-semibold text-white">{classItem.title}</h3>
-                        {classItem.status === 'live' && (
-                          <span className="px-3 py-1 bg-red-500 text-white text-sm font-bold rounded-full animate-pulse">
-                            LIVE NOW
-                          </span>
-                        )}
+            {upcomingClasses.length === 0 ? (
+              <p className="text-gray-400 text-center py-8">No upcoming classes scheduled</p>
+            ) : (
+              <div className="space-y-4">
+                {upcomingClasses.map((classItem) => (
+                  <div
+                    key={classItem.session_id}
+                    className="bg-[#0d1420] rounded-lg p-6 border border-gray-800 hover:border-gray-700 transition-all"
+                  >
+                    <div className="flex items-start justify-between">
+                      <div className="flex-1">
+                        <div className="flex items-center gap-3 mb-3">
+                          <h3 className="text-lg font-semibold text-white">{classItem.course_name}</h3>
+                          {classItem.status === 'live' && (
+                            <span className="px-3 py-1 bg-red-500 text-white text-sm font-bold rounded-full animate-pulse">
+                              LIVE NOW
+                            </span>
+                          )}
+                        </div>
+                        <div className="grid grid-cols-2 gap-4 text-gray-400 text-sm">
+                          <div className="flex items-center gap-2">
+                            <Users className="w-4 h-4" />
+                            <span>Mentor: {classItem.faculty_name}</span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <Calendar className="w-4 h-4" />
+                            <span>Date: {formatDate(classItem.session_datetime)}</span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <Clock className="w-4 h-4" />
+                            <span>Time: {formatTime(classItem.session_datetime)}</span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <Clock className="w-4 h-4" />
+                            <span>Duration: {classItem.duration} min</span>
+                          </div>
+                        </div>
                       </div>
-                      <div className="grid grid-cols-2 gap-4 text-gray-400 text-sm">
-                        <div className="flex items-center gap-2">
-                          <Users className="w-4 h-4" />
-                          <span>Mentor: {classItem.mentor}</span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <BookOpen className="w-4 h-4" />
-                          <span>Program: {classItem.program}</span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <Calendar className="w-4 h-4" />
-                          <span>Date: {classItem.date}</span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <Clock className="w-4 h-4" />
-                          <span>Time: {classItem.time} ({classItem.duration})</span>
-                        </div>
-                      </div>
+                      <button className="ml-6 px-6 py-3 bg-[#FFC540] text-black rounded-lg font-bold hover:bg-[#e6b139] transition-all flex items-center gap-2">
+                        <Video className="w-4 h-4" />
+                        {classItem.status === 'live' ? 'Join Class' : 'Add to Calendar'}
+                      </button>
                     </div>
-                    <button className="ml-6 px-6 py-3 bg-[#FFC540] text-black rounded-lg font-bold hover:bg-[#FFC540] transition-all flex items-center gap-2">
-                      <Video className="w-4 h-4" />
-                      {classItem.status === 'live' ? 'Join Class' : 'Add to Calendar'}
-                    </button>
                   </div>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            )}
           </div>
         )}
 
@@ -806,7 +859,7 @@ const StudentProfile = () => {
                       </div>
                     </div>
                     {assignment.status === 'pending' && (
-                      <button className="ml-6 px-6 py-3 bg-[#FFC540] text-black rounded-lg font-bold hover:bg-[#FFC540] transition-all text-sm">
+                      <button className="ml-6 px-6 py-3 bg-[#FFC540] text-black rounded-lg font-bold hover:bg-[#e6b139] transition-all text-sm">
                         Submit Assignment
                       </button>
                     )}
@@ -832,7 +885,7 @@ const StudentProfile = () => {
                 </h2>
                 <button
                   onClick={() => setShowUploadModal(true)}
-                  className="px-6 py-2 bg-[#FFC540] text-black rounded-lg font-bold hover:bg-[#FFC540] transition-all flex items-center gap-2 text-sm"
+                  className="px-6 py-2 bg-[#FFC540] text-black rounded-lg font-bold hover:bg-[#e6b139] transition-all flex items-center gap-2 text-sm"
                 >
                   <Upload className="w-4 h-4" />
                   Upload File
@@ -1033,7 +1086,7 @@ const StudentProfile = () => {
                 <button
                   onClick={handleUpload}
                   disabled={!selectedFile}
-                  className="flex-1 px-6 py-3 bg-[#FFC540] text-black rounded-lg font-bold hover:bg-[#FFC540] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="flex-1 px-6 py-3 bg-[#FFC540] text-black rounded-lg font-bold hover:bg-[#e6b139] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   Upload
                 </button>
