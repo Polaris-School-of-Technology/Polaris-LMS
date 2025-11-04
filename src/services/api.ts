@@ -489,6 +489,11 @@ const lmsApi = {
         };
       }
     },
+    getClassSchedule: async (page: number, limit: number, token: string) => {
+      return apiRequest(`${LMS_BASE_URL}/api/v1/student/schedule/class-schedule/?page=${page}&limit=${limit}`, {
+        method: 'GET',
+      }, token);
+    }
   },
 
   mentors: {
@@ -1009,6 +1014,7 @@ export const useApi = () => {
         getAll: () => lmsApi.students.getAll(token),
         getDashboardCards: () => lmsApi.students.getDashboardCards(token),
         getStudentDetails: (page: number, limit: number) => lmsApi.adminStudents.getStudentDetails(page, limit, token),
+        getClassSchedule: (page: number, limit: number) => lmsApi.students.getClassSchedule(page, limit, token),
       },
       mentors: {
         getAll: () => lmsApi.mentors.getAll(token),
