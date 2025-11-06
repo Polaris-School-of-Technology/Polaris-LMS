@@ -96,127 +96,63 @@ const StudentProfile = () => {
     githubContributions: 0
   });
 
+  // Helper: Get session end time
+  const getSessionEndTime = (session: UpcomingClass) => {
+    const sessionStart = new Date(session.session_datetime);
+    return new Date(sessionStart.getTime() + session.duration * 60000);
+  };
+
+  // Helper: Check if session is currently live
+  const isSessionLive = (session: UpcomingClass, now: Date) => {
+    const sessionStart = new Date(session.session_datetime);
+    const sessionEnd = getSessionEndTime(session);
+    return now.getTime() >= sessionStart.getTime() && now.getTime() < sessionEnd.getTime();
+  };
+
+  // Helper: Check if session has ended
+  const hasSessionEnded = (session: UpcomingClass, now: Date) => {
+    return now.getTime() >= getSessionEndTime(session).getTime();
+  };
+
+  // Helper: Process session to update status
+  const processSession = (session: UpcomingClass, now: Date) => {
+    const isRescheduled = session.status === 'rescheduled';
+    const status = isSessionLive(session, now) ? 'live' : session.status;
+    
+    return { ...session, status, rescheduled: isRescheduled };
+  };
+
   const fetchDashboardCards = async () => {
     try {
       const data = await api.lms.students.getDashboardCards();
-      console.log('Dashboard Cards API Response:', data);
-      
       setDashboardCards({
         totalClasses: data.totalClasses || 0,
         totalCourses: data.totalCourses || 0,
         avgAttendance: data.avgAttendance || 0,
-        githubContributions: 0 // GitHub data not in this API yet
+        githubContributions: 0
       });
     } catch (error) {
       console.error('Error fetching dashboard cards:', error);
     }
   };
 
-  useEffect(() => {
-    fetchUpcomingClasses();
-    fetchDashboardCards();
-
-    // Auto-refresh every 5 minutes to update class statuses and remove ended classes
-    const refreshInterval = setInterval(() => {
-      fetchUpcomingClasses();
-      fetchDashboardCards();
-    }, 300000); // 300000ms = 5 minutes
-
-    // Cleanup interval on component unmount
-    return () => clearInterval(refreshInterval);
-  }, []);
-
-  // Real-time status updater - updates class statuses every 30 seconds without API call
-  useEffect(() => {
-    const statusUpdateInterval = setInterval(() => {
-      setUpcomingClasses(currentClasses => {
-        const now = new Date();
-        
-        return currentClasses
-          .map(session => {
-            const sessionStart = new Date(session.session_datetime);
-            const sessionEnd = new Date(sessionStart.getTime() + session.duration * 60000);
-            
-            // Keep rescheduled flag from API
-            const isRescheduled = session.rescheduled || session.status === 'rescheduled';
-            
-            // Determine display status based on time
-            let displayStatus: string = session.status;
-            
-            if (now.getTime() >= sessionStart.getTime() && now.getTime() < sessionEnd.getTime()) {
-              displayStatus = 'live';
-            } else if (now.getTime() >= sessionEnd.getTime()) {
-              displayStatus = 'completed';
-            } else if (!isRescheduled) {
-              // Only override to 'upcoming' if not rescheduled
-              displayStatus = 'upcoming';
-            }
-            
-            return { ...session, status: displayStatus, rescheduled: isRescheduled };
-          })
-          .filter(session => {
-            const sessionStart = new Date(session.session_datetime);
-            const sessionEnd = new Date(sessionStart.getTime() + session.duration * 60000);
-            return now.getTime() < sessionEnd.getTime();
-          });
-      });
-    }, 30000); // 30000ms = 30 seconds
-
-    return () => clearInterval(statusUpdateInterval);
-  }, []);
-
   const fetchUpcomingClasses = async () => {
     try {
       setLoading(true);
       const response = await api.lms.students.getClassSchedule(1, 10);
-      console.log('API Response:', response);
       
       if (response.success && response.data) {
-        const now = new Date(); // Get the current date and time
+        const now = new Date();
+        const sessions = response.data
+          .map((session: UpcomingClass) => processSession(session, now))
+          .filter((session: UpcomingClass) => 
+            session.status !== 'completed' && !hasSessionEnded(session, now)
+          )
+          .sort((a: UpcomingClass, b: UpcomingClass) => 
+            new Date(a.session_datetime).getTime() - new Date(b.session_datetime).getTime()
+          );
         
-        // Filter and update status for sessions
-        const processedSessions = response.data
-          .map((session: UpcomingClass) => {
-            const sessionStart = new Date(session.session_datetime);
-            const sessionEnd = new Date(sessionStart.getTime() + session.duration * 60000); // Add duration in milliseconds
-            
-            // Check if this is a rescheduled session from API status
-            const isRescheduled = session.status === 'rescheduled';
-            
-            // Determine display status based on time (override API status for real-time accuracy)
-            let displayStatus: string = session.status;
-            
-            if (now.getTime() >= sessionStart.getTime() && now.getTime() < sessionEnd.getTime()) {
-              // Class has started but not ended - show as LIVE
-              displayStatus = 'live';
-            } else if (now.getTime() >= sessionEnd.getTime()) {
-              // Class has ended - mark as completed
-              displayStatus = 'completed';
-            } else if (session.status !== 'rescheduled') {
-              // Class hasn't started yet - show as upcoming (unless it's rescheduled)
-              displayStatus = 'upcoming';
-            }
-            
-            return { 
-              ...session, 
-              status: displayStatus,
-              rescheduled: isRescheduled 
-            };
-          })
-          .filter((session: UpcomingClass) => {
-            const sessionStart = new Date(session.session_datetime);
-            const sessionEnd = new Date(sessionStart.getTime() + session.duration * 60000);
-            
-            // Show only classes that haven't ended yet
-            return now.getTime() < sessionEnd.getTime();
-          });
-        
-        // Sort by date (earliest first)
-        const sortedSessions = processedSessions.sort((a: UpcomingClass, b: UpcomingClass) => 
-          new Date(a.session_datetime).getTime() - new Date(b.session_datetime).getTime()
-        );
-        
-        setUpcomingClasses(sortedSessions);
+        setUpcomingClasses(sessions);
       }
     } catch (error) {
       console.error('Error fetching upcoming classes:', error);
@@ -224,6 +160,32 @@ const StudentProfile = () => {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    fetchUpcomingClasses();
+    fetchDashboardCards();
+
+    const refreshInterval = setInterval(() => {
+      fetchUpcomingClasses();
+      fetchDashboardCards();
+    }, 300000); // 5 minutes
+
+    return () => clearInterval(refreshInterval);
+  }, []);
+
+  // Update class statuses every 30 seconds
+  useEffect(() => {
+    const updateInterval = setInterval(() => {
+      setUpcomingClasses(currentClasses => {
+        const now = new Date();
+        return currentClasses
+          .map(session => processSession(session, now))
+          .filter(session => session.status !== 'completed' && !hasSessionEnded(session, now));
+      });
+    }, 30000); // 30 seconds
+
+    return () => clearInterval(updateInterval);
+  }, []);
 
   const formatDate = (dateString: string) => {
     const sessionDate = new Date(dateString);
@@ -248,6 +210,31 @@ const StudentProfile = () => {
   const formatTime = (dateString: string) => {
     const date = new Date(dateString);
     return date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
+  };
+
+  // Generate Google Calendar link
+  const generateGoogleCalendarLink = (classItem: UpcomingClass) => {
+    const startDate = new Date(classItem.session_datetime);
+    const endDate = new Date(startDate.getTime() + classItem.duration * 60000);
+    
+    const formatDateForGoogle = (date: Date) => {
+      return date.toISOString().replace(/-|:|\.\d+/g, '');
+    };
+    
+    const params = new URLSearchParams({
+      action: 'TEMPLATE',
+      text: classItem.course_name,
+      dates: `${formatDateForGoogle(startDate)}/${formatDateForGoogle(endDate)}`,
+      details: `Faculty: ${classItem.faculty_name}\nDuration: ${classItem.duration} minutes\nVenue: ${classItem.venue || 'Online'}`,
+      location: classItem.venue || 'Online',
+    });
+    
+    return `https://calendar.google.com/calendar/render?${params.toString()}`;
+  };
+
+  const handleAddToCalendar = (classItem: UpcomingClass) => {
+    const calendarLink = generateGoogleCalendarLink(classItem);
+    window.open(calendarLink, '_blank');
   };
 
   const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -627,14 +614,14 @@ const StudentProfile = () => {
                                   </span>
                                 )}
                                 {classItem.rescheduled && (
-                                  <span className="px-2 py-1 bg-[#FFC540]/20 text-[#FFC540] text-xs font-bold rounded-full border border-[#FFC540]/30">
+                                  <span className="px-3 py-1 bg-[#FFC540] text-black text-xs font-bold rounded-full">
                                     RESCHEDULED
                                   </span>
                                 )}
                               </div>
-                              {classItem.rescheduled && classItem.originalDate && (
-                                <div className="mb-2 text-xs text-[#FFC540]/80">
-                                  Originally scheduled for {classItem.originalDate}
+                              {classItem.rescheduled && (
+                                <div className="mb-2 text-xs text-[#FFC540]">
+                                  Originally scheduled for {classItem.originalDate || 'an earlier date'}
                                 </div>
                               )}
                               <div className="flex items-center gap-4 text-sm text-gray-400">
@@ -656,9 +643,21 @@ const StudentProfile = () => {
                                 </span>
                               </div>
                             </div>
-                            <button className="ml-4 px-4 py-2 bg-[#FFC540] text-black rounded-lg font-semibold hover:bg-[#e6b139] transition-all flex items-center gap-2 text-sm">
-                              <Video className="w-4 h-4" />
-                              {classItem.status === 'live' ? 'Join Now' : 'Calendar'}
+                            <button 
+                              onClick={() => classItem.status === 'live' ? null : handleAddToCalendar(classItem)}
+                              className="ml-4 px-4 py-2 bg-[#FFC540] text-black rounded-lg font-semibold hover:bg-[#e6b139] transition-all flex items-center gap-2 text-sm"
+                            >
+                              {classItem.status === 'live' ? (
+                                <>
+                                  <Video className="w-4 h-4" />
+                                  Join Now
+                                </>
+                              ) : (
+                                <>
+                                  <Calendar className="w-4 h-4" />
+                                  Add to Calendar
+                                </>
+                              )}
                             </button>
                           </div>
                         </div>
@@ -832,7 +831,17 @@ const StudentProfile = () => {
                               LIVE NOW
                             </span>
                           )}
+                          {classItem.rescheduled && (
+                            <span className="px-3 py-1 bg-[#FFC540] text-black text-sm font-bold rounded-full">
+                              RESCHEDULED
+                            </span>
+                          )}
                         </div>
+                        {classItem.rescheduled && (
+                          <div className="mb-3 text-sm text-[#FFC540]">
+                            Originally scheduled for {classItem.originalDate || 'an earlier date'}
+                          </div>
+                        )}
                         <div className="grid grid-cols-2 gap-4 text-gray-400 text-sm">
                           <div className="flex items-center gap-2">
                             <Users className="w-4 h-4" />
@@ -852,9 +861,21 @@ const StudentProfile = () => {
                           </div>
                         </div>
                       </div>
-                      <button className="ml-6 px-6 py-3 bg-[#FFC540] text-black rounded-lg font-bold hover:bg-[#e6b139] transition-all flex items-center gap-2">
-                        <Video className="w-4 h-4" />
-                        {classItem.status === 'live' ? 'Join Class' : 'Add to Calendar'}
+                      <button 
+                        onClick={() => classItem.status === 'live' ? null : handleAddToCalendar(classItem)}
+                        className="ml-6 px-6 py-3 bg-[#FFC540] text-black rounded-lg font-bold hover:bg-[#e6b139] transition-all flex items-center gap-2"
+                      >
+                        {classItem.status === 'live' ? (
+                          <>
+                            <Video className="w-4 h-4" />
+                            Join Class
+                          </>
+                        ) : (
+                          <>
+                            <Calendar className="w-4 h-4" />
+                            Add to Calendar
+                          </>
+                        )}
                       </button>
                     </div>
                   </div>
