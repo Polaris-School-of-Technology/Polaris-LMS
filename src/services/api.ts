@@ -476,11 +476,34 @@ const lmsApi = {
           }, token)
         ]);
 
-        return {
-          totalClasses: totalClasses.data?.total_classes ?? totalClasses.data ?? 0,
-          totalCourses: totalCourses.data?.total_courses ?? totalCourses.data ?? 0,
-          avgAttendance: avgAttendance.data?.attendance_percentage ?? avgAttendance.data ?? 0
+        console.log('Raw API Responses:', { 
+          totalClasses: totalClasses.data, 
+          totalCourses: totalCourses.data, 
+          avgAttendance: avgAttendance.data 
+        });
+
+        // Extract values, handling different response formats
+        const extractNumber = (value: any, fieldName?: string) => {
+          if (typeof value === 'number') return value;
+          if (typeof value === 'object' && value !== null) {
+            // Try specific field first, then common field names
+            if (fieldName && value[fieldName] !== undefined) {
+              return typeof value[fieldName] === 'number' ? value[fieldName] : 0;
+            }
+            return value.attendance_percentage ?? value.total_classes ?? value.total_courses ?? 0;
+          }
+          return 0;
         };
+
+        const extractedValues = {
+          totalClasses: totalClasses.data?.total_classes ?? extractNumber(totalClasses.data, 'total_classes'),
+          totalCourses: totalCourses.data?.total_courses ?? extractNumber(totalCourses.data, 'total_courses'),
+          avgAttendance: avgAttendance.data?.attendance_percentage ?? extractNumber(avgAttendance.data, 'attendance_percentage')
+        };
+
+        console.log('Extracted Values:', extractedValues);
+
+        return extractedValues;
       } catch (error) {
         return {
           totalClasses: 0,
