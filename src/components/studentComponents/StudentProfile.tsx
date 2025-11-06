@@ -95,6 +95,11 @@ const StudentProfile = () => {
   const [loadingClasses, setLoadingClasses] = useState<boolean>(true);
   const [classesError, setClassesError] = useState<string | null>(null);
 
+  // Assignments state
+  const [assignments, setAssignments] = useState<Assignment[]>([]);
+  const [loadingAssignments, setLoadingAssignments] = useState<boolean>(true);
+  const [assignmentsError, setAssignmentsError] = useState<string | null>(null);
+
   // Pagination state
   const [upcomingPage, setUpcomingPage] = useState<number>(1);
   const [upcomingPageSize] = useState<number>(5);
@@ -221,6 +226,81 @@ const StudentProfile = () => {
     return () => { mounted = false; };
   }, [api.lms.students]);
 
+  // Fetch assignments from API
+  useEffect(() => {
+    let mounted = true;
+    const fetchAssignments = async () => {
+      try {
+        setLoadingAssignments(true);
+        setAssignmentsError(null);
+        const response = await api.lms.students.getAssignments();
+        console.log("assignments response: ", response);
+
+        if (response && response.success === false) {
+          throw new Error(response.error || 'Failed to fetch assignments');
+        }
+        const data = (response && Array.isArray(response)) ? response : (response?.data || []);
+        
+        // Map API response to Assignment format
+        const mapped: Assignment[] = data.map((item: any) => {
+          const assignment = item.assignments || {};
+          const dueDate = assignment.due_date ? new Date(assignment.due_date) : null;
+          
+          // Format due date
+          let dueDateDisplay = '';
+          if (dueDate) {
+            dueDateDisplay = dueDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+          }
+          
+          // Determine status
+          let status: Assignment['status'] = 'pending';
+          if (item.obtained_marks !== null && item.obtained_marks !== undefined && item.graded_at) {
+            status = 'graded';
+          } else if (item.submitted_at) {
+            status = 'submitted';
+          } else {
+            status = 'pending';
+          }
+          
+          // Calculate grade if graded
+          let grade: string | undefined = undefined;
+          if (status === 'graded' && item.obtained_marks !== null && assignment.total_marks) {
+            const percentage = (item.obtained_marks / assignment.total_marks) * 100;
+            if (percentage >= 90) grade = 'A';
+            else if (percentage >= 80) grade = 'B';
+            else if (percentage >= 70) grade = 'C';
+            else if (percentage >= 60) grade = 'D';
+            else grade = 'F';
+          }
+          
+          return {
+            id: item.id || item.assignment_id || Date.now().toString(),
+            title: assignment.title || 'Assignment',
+            program: assignment.courses?.course_code || assignment.batches?.batch_name || 'N/A',
+            dueDate: dueDateDisplay,
+            status,
+            grade,
+          } as Assignment;
+        });
+        
+        if (mounted) {
+          setAssignments(mapped);
+        }
+      } catch (error: any) {
+        if (mounted) {
+          setAssignmentsError(error?.message || 'Failed to load assignments');
+        }
+      } finally {
+        if (mounted) {
+          setLoadingAssignments(false);
+        }
+      }
+    };
+
+    fetchAssignments();
+    return () => { mounted = false; };
+  }, [api.lms.students]);
+
   // Filter and paginate upcoming classes (session_datetime >= today)
   const todayStart = new Date();
   todayStart.setHours(0, 0, 0, 0);
@@ -302,30 +382,6 @@ const StudentProfile = () => {
     },
   ];
 
-  const assignments: Assignment[] = [
-    {
-      id: '1',
-      title: 'Build a Custom Hook',
-      program: 'React.js',
-      dueDate: 'Oct 5, 2025',
-      status: 'pending',
-    },
-    {
-      id: '2',
-      title: 'API Integration Project',
-      program: 'Node.js',
-      dueDate: 'Oct 3, 2025',
-      status: 'submitted',
-    },
-    {
-      id: '3',
-      title: 'Data Analysis Script',
-      program: 'Python',
-      dueDate: 'Sep 30, 2025',
-      status: 'graded',
-      grade: 'A',
-    },
-  ];
 
   const githubContributions: GitHubContribution[] = [
     {
@@ -754,7 +810,16 @@ const StudentProfile = () => {
                     Assignments
                   </h2>
                   <div className="space-y-3">
-                    {assignments.map((assignment) => (
+                    {loadingAssignments && (
+                      <div className="text-gray-400 text-xs py-2">Loading assignments...</div>
+                    )}
+                    {!loadingAssignments && assignmentsError && (
+                      <div className="text-red-400 text-xs py-2">{assignmentsError}</div>
+                    )}
+                    {!loadingAssignments && !assignmentsError && assignments.length === 0 && (
+                      <div className="text-gray-400 text-xs py-2">No assignments found.</div>
+                    )}
+                    {!loadingAssignments && !assignmentsError && assignments.slice(0, 3).map((assignment) => (
                       <div
                         key={assignment.id}
                         className="bg-[#0d1420] rounded-lg p-4 border border-gray-800 hover:border-gray-700 transition-all"
@@ -967,7 +1032,16 @@ const StudentProfile = () => {
           <div className="bg-[#1a2332] rounded-xl p-6 border border-gray-800">
             <h2 className="text-xl font-bold text-white mb-6">Assignments</h2>
             <div className="space-y-4">
-              {assignments.map((assignment) => (
+              {loadingAssignments && (
+                <div className="text-gray-400 py-4">Loading assignments...</div>
+              )}
+              {!loadingAssignments && assignmentsError && (
+                <div className="text-red-400 py-4">{assignmentsError}</div>
+              )}
+              {!loadingAssignments && !assignmentsError && assignments.length === 0 && (
+                <div className="text-gray-400 py-4">No assignments found.</div>
+              )}
+              {!loadingAssignments && !assignmentsError && assignments.map((assignment) => (
                 <div
                   key={assignment.id}
                   className="bg-[#0d1420] rounded-lg p-6 border border-gray-800 hover:border-gray-700 transition-all"
