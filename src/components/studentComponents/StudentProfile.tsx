@@ -10,7 +10,7 @@ interface UpcomingClass {
   session_datetime: string;
   duration: number;
   venue: string;
-  status: 'upcoming' | 'live' | 'completed';
+  status: 'scheduled' | 'pending' | 'upcoming' | 'live' | 'completed' | 'rescheduled' | string;
   rescheduled?: boolean;
   originalDate?: string;
 }
@@ -89,37 +89,130 @@ const StudentProfile = () => {
       program: 'Node.js',
     },
   ]);
+  const [dashboardCards, setDashboardCards] = useState({
+    totalClasses: 0,
+    totalCourses: 0,
+    avgAttendance: 0,
+    githubContributions: 0
+  });
+
+  const fetchDashboardCards = async () => {
+    try {
+      const data = await api.lms.students.getDashboardCards();
+      console.log('Dashboard Cards API Response:', data);
+      
+      setDashboardCards({
+        totalClasses: data.totalClasses || 0,
+        totalCourses: data.totalCourses || 0,
+        avgAttendance: data.avgAttendance || 0,
+        githubContributions: 0 // GitHub data not in this API yet
+      });
+    } catch (error) {
+      console.error('Error fetching dashboard cards:', error);
+    }
+  };
 
   useEffect(() => {
     fetchUpcomingClasses();
+    fetchDashboardCards();
+
+    // Auto-refresh every 5 minutes to update class statuses and remove ended classes
+    const refreshInterval = setInterval(() => {
+      fetchUpcomingClasses();
+      fetchDashboardCards();
+    }, 300000); // 300000ms = 5 minutes
+
+    // Cleanup interval on component unmount
+    return () => clearInterval(refreshInterval);
+  }, []);
+
+  // Real-time status updater - updates class statuses every 30 seconds without API call
+  useEffect(() => {
+    const statusUpdateInterval = setInterval(() => {
+      setUpcomingClasses(currentClasses => {
+        const now = new Date();
+        
+        return currentClasses
+          .map(session => {
+            const sessionStart = new Date(session.session_datetime);
+            const sessionEnd = new Date(sessionStart.getTime() + session.duration * 60000);
+            
+            // Keep rescheduled flag from API
+            const isRescheduled = session.rescheduled || session.status === 'rescheduled';
+            
+            // Determine display status based on time
+            let displayStatus: string = session.status;
+            
+            if (now.getTime() >= sessionStart.getTime() && now.getTime() < sessionEnd.getTime()) {
+              displayStatus = 'live';
+            } else if (now.getTime() >= sessionEnd.getTime()) {
+              displayStatus = 'completed';
+            } else if (!isRescheduled) {
+              // Only override to 'upcoming' if not rescheduled
+              displayStatus = 'upcoming';
+            }
+            
+            return { ...session, status: displayStatus, rescheduled: isRescheduled };
+          })
+          .filter(session => {
+            const sessionStart = new Date(session.session_datetime);
+            const sessionEnd = new Date(sessionStart.getTime() + session.duration * 60000);
+            return now.getTime() < sessionEnd.getTime();
+          });
+      });
+    }, 30000); // 30000ms = 30 seconds
+
+    return () => clearInterval(statusUpdateInterval);
   }, []);
 
   const fetchUpcomingClasses = async () => {
     try {
       setLoading(true);
-      // Get token from localStorage or however your app stores it
       const response = await api.lms.students.getClassSchedule(1, 10);
       console.log('API Response:', response);
       
       if (response.success && response.data) {
         const now = new Date(); // Get the current date and time
         
-        // Filter for sessions that are:
-        // 1. Marked as 'upcoming' or 'live' AND
-        // 2. Have a session_datetime that is AFTER or EQUAL to the current time ('now').
-        const filteredSessions = response.data.filter(
-          (session: UpcomingClass) => {
-            const sessionDate = new Date(session.session_datetime);
+        // Filter and update status for sessions
+        const processedSessions = response.data
+          .map((session: UpcomingClass) => {
+            const sessionStart = new Date(session.session_datetime);
+            const sessionEnd = new Date(sessionStart.getTime() + session.duration * 60000); // Add duration in milliseconds
             
-            return (
-              (session.status === 'upcoming' || session.status === 'live') &&
-              sessionDate.getTime() >= now.getTime() // KEY CHANGE: Filter out past sessions
-            );
-          }
-        );
+            // Check if this is a rescheduled session from API status
+            const isRescheduled = session.status === 'rescheduled';
+            
+            // Determine display status based on time (override API status for real-time accuracy)
+            let displayStatus: string = session.status;
+            
+            if (now.getTime() >= sessionStart.getTime() && now.getTime() < sessionEnd.getTime()) {
+              // Class has started but not ended - show as LIVE
+              displayStatus = 'live';
+            } else if (now.getTime() >= sessionEnd.getTime()) {
+              // Class has ended - mark as completed
+              displayStatus = 'completed';
+            } else if (session.status !== 'rescheduled') {
+              // Class hasn't started yet - show as upcoming (unless it's rescheduled)
+              displayStatus = 'upcoming';
+            }
+            
+            return { 
+              ...session, 
+              status: displayStatus,
+              rescheduled: isRescheduled 
+            };
+          })
+          .filter((session: UpcomingClass) => {
+            const sessionStart = new Date(session.session_datetime);
+            const sessionEnd = new Date(sessionStart.getTime() + session.duration * 60000);
+            
+            // Show only classes that haven't ended yet
+            return now.getTime() < sessionEnd.getTime();
+          });
         
         // Sort by date (earliest first)
-        const sortedSessions = filteredSessions.sort((a: UpcomingClass, b: UpcomingClass) => 
+        const sortedSessions = processedSessions.sort((a: UpcomingClass, b: UpcomingClass) => 
           new Date(a.session_datetime).getTime() - new Date(b.session_datetime).getTime()
         );
         
@@ -193,26 +286,28 @@ const StudentProfile = () => {
     logout();
   };
 
+  // Dynamic mentor info - should be fetched from API
   const mentorInfo: MentorInfo = {
-    name: 'Sarah Mitchell',
-    photo: 'https://images.pexels.com/photos/774909/pexels-photo-774909.jpeg?auto=compress&cs=tinysrgb&w=400',
-    email: 'sarah.mitchell@academy.com',
-    phone: '+1 (555) 123-4567',
-    department: 'Frontend Development',
-    bio: 'Experienced React developer with 8+ years in the industry. Passionate about teaching modern web development and helping students achieve their goals.',
+    name: (user as any)?.mentorName || 'Mentor',
+    photo: (user as any)?.mentorPhoto || 'https://images.pexels.com/photos/774909/pexels-photo-774909.jpeg?auto=compress&cs=tinysrgb&w=400',
+    email: (user as any)?.mentorEmail || 'mentor@polariscampus.com',
+    phone: (user as any)?.mentorPhone || 'Contact admin for details',
+    department: (user as any)?.mentorDepartment || 'Development',
+    bio: (user as any)?.mentorBio || 'Experienced developer passionate about teaching and helping students achieve their goals.',
   };
 
+  // Dynamic student data from authenticated user
   const studentData = {
-    name: 'Alex Johnson',
-    email: 'alex.johnson@example.com',
+    name: user?.name || 'Student',
+    email: user?.email || '',
     program: 'Open Source Development',
     enrolledPrograms: ['React.js', 'Node.js', 'Python', 'DevOps'],
-    avatar: 'AJ',
-    totalClasses: 24,
-    attendanceRate: 92,
+    avatar: user?.name ? user.name.split(' ').map((n: string) => n[0]).join('').toUpperCase() : 'ST',
+    totalClasses: dashboardCards.totalClasses,
+    attendanceRate: dashboardCards.avgAttendance,
     completedAssignments: 18,
     totalAssignments: 20,
-    githubContributions: 45,
+    githubContributions: dashboardCards.githubContributions,
   };
 
   const recordings: Recording[] = [
@@ -471,7 +566,7 @@ const StudentProfile = () => {
                     8%
                   </span>
                 </div>
-                <div className="text-3xl font-bold text-white mb-1">{studentData.enrolledPrograms.length}</div>
+                <div className="text-3xl font-bold text-white mb-1">{dashboardCards.totalCourses}</div>
                 <div className="text-gray-400 text-sm">Active Programs</div>
               </div>
 
