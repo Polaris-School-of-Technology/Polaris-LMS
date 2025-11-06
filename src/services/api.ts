@@ -469,7 +469,7 @@ const lmsApi = {
     },
 
     getAssignments: async (token: string) => {
-      return lmsApiRequest(`${LMS_BASE_URL}/api/v1/student/assignments`, {
+      return lmsApiRequest(`${LMS_BASE_URL}/api/v1/studentAssignments/assignments`, {
         method: 'GET',
       }, token);
     },
