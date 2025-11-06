@@ -477,9 +477,9 @@ const lmsApi = {
         ]);
 
         return {
-          totalClasses: totalClasses.data || 0,
-          totalCourses: totalCourses.data || 0,
-          avgAttendance: avgAttendance.data || 0
+          totalClasses: totalClasses.data?.total_classes ?? totalClasses.data ?? 0,
+          totalCourses: totalCourses.data?.total_courses ?? totalCourses.data ?? 0,
+          avgAttendance: avgAttendance.data?.attendance_percentage ?? avgAttendance.data ?? 0
         };
       } catch (error) {
         return {
