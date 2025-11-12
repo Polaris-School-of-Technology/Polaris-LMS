@@ -639,6 +639,24 @@ const lmsApi = {
       }, token);
     },
 
+   getTodayClasses: async (token: string) => {
+      return lmsApiRequest(`${LMS_BASE_URL}/api/v1/mentor/cards/today-classes`, {
+          method: 'GET',
+      }, token);
+    },
+
+    getTotalParticipants: async (token: string) => {
+      return lmsApiRequest(`${LMS_BASE_URL}/api/v1/mentor/cards/total-participants`, {
+          method: 'GET',
+      }, token);
+    },
+
+    getTodayClassesHours: async (token: string) => {
+      return lmsApiRequest(`${LMS_BASE_URL}/api/v1/mentor/cards/today-classes-hours`, {
+          method: 'GET',
+      }, token);
+    },
+
     submitFeedback: async (feedbackData: any, token: string) => {
       return lmsApiRequest(`${LMS_BASE_URL}/api/v1/mentor/cards/submit-feedback`, {
         method: 'POST',
@@ -1170,6 +1188,9 @@ export const useApi = () => {
         getTotalClasses: () => lmsApi.mentors.getTotalClasses(token),
         getTotalCourses: () => lmsApi.mentors.getTotalCourses(token),
         getAvgAttendance: () => lmsApi.mentors.getAvgAttendance(token),
+        getTodayClasses: () => lmsApi.mentors.getTodayClasses(token),
+        getTotalParticipants: () => lmsApi.mentors.getTotalParticipants(token),
+        getTodayClassesHours: () => lmsApi.mentors.getTodayClassesHours(token),
         submitFeedback: (feedbackData: any) => lmsApi.mentors.submitFeedback(feedbackData, token),
         getBatches: () => lmsApi.mentors.getBatches(token),
         getSections: (batchId: string) => lmsApi.mentors.getSections(batchId, token),

@@ -31,13 +31,24 @@ interface ActiveSession extends SessionData {
   recording: boolean;
 }
 
+interface SessionStats {
+  sessionsToday: number;
+  totalParticipants: number;
+  sessionHours: number;
+}
+
 const MentorSessions: React.FC = () => {
   const [activeSessions, setActiveSessions] = useState<ActiveSession[]>([]);
   const [upcomingSessions, setUpcomingSessions] = useState<SessionData[]>([]);
+  const [sessionStats, setSessionStats] = useState<SessionStats>({
+    sessionsToday: 0,
+    totalParticipants: 0,
+    sessionHours: 0
+  });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const { user } = useAuth();
-  const facultyId = user?.id
+  const facultyId = user?.id;
   
   const api = useApi();
 
@@ -49,7 +60,26 @@ const MentorSessions: React.FC = () => {
 
   useEffect(() => {
     fetchSessions();
+    fetchSessionStats();
   }, []);
+
+  const fetchSessionStats = async () => {
+    try {
+      const [todayClassesRes, participantsRes, hoursRes] = await Promise.all([
+        api.lms.mentors.getTodayClasses(),
+        api.lms.mentors.getTotalParticipants(),
+        api.lms.mentors.getTodayClassesHours()
+      ]);
+
+      setSessionStats({
+        sessionsToday: todayClassesRes.data?.total_classes || 0,
+        totalParticipants: participantsRes.data?.total_participants || 0,
+        sessionHours: hoursRes.data?.total_hours || 0
+      });
+    } catch (err) {
+      console.error('Error fetching session stats:', err);
+    }
+  };
 
   const fetchSessions = async () => {
     try {
@@ -57,8 +87,8 @@ const MentorSessions: React.FC = () => {
       setError(null);
       const response = await api.lms.adminSchedule.getFacultySessions(facultyId);
       
-      console.log('API Response:', response); // ADD THIS LINE
-      console.log('Sessions data:', response.data); // ADD THIS LINE
+      console.log('API Response:', response);
+      console.log('Sessions data:', response.data);
 
       const sessions = response.data || [];
       const now = new Date();
@@ -69,7 +99,6 @@ const MentorSessions: React.FC = () => {
         const sessionDate = new Date(session.session_datetime);
         const sessionEnd = new Date(sessionDate.getTime() + session.duration * 60000);
 
-        // Show active sessions (currently running)
         if (sessionDate <= now && now <= sessionEnd && session.status !== 'completed' && session.status !== 'cancelled') {
           active.push({
             ...session,
@@ -83,7 +112,6 @@ const MentorSessions: React.FC = () => {
             recording: true
           });
         } 
-        // Show upcoming sessions (scheduled in future) or completed sessions (show in upcoming for reference)
         else if (sessionDate > now && session.status !== 'cancelled' && session.status !== 'completed') {
           upcoming.push(session);
         }
@@ -174,7 +202,10 @@ const MentorSessions: React.FC = () => {
         </div>
         <div className="flex items-center space-x-3">
           <button 
-            onClick={fetchSessions}
+            onClick={() => {
+              fetchSessions();
+              fetchSessionStats();
+            }}
             className="flex items-center space-x-2 bg-yellow-400 text-black px-4 py-2 rounded-lg hover:bg-yellow-500 transition-colors duration-200"
           >
             <Video className="h-4 w-4" />
@@ -232,7 +263,6 @@ const MentorSessions: React.FC = () => {
                   </div>
                 </div>
 
-                {/* Session Controls */}
                 <div className="flex items-center justify-between pt-4 border-t border-red-200">
                   <div className="flex items-center space-x-3">
                     <button
@@ -341,8 +371,8 @@ const MentorSessions: React.FC = () => {
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm font-medium text-gray-600">Active Sessions</p>
-              <p className="text-3xl font-bold text-gray-900">{activeSessions.length}</p>
+              <p className="text-sm font-medium text-gray-600">Sessions Today</p>
+              <p className="text-3xl font-bold text-gray-900">{sessionStats.sessionsToday}</p>
             </div>
             <div className="w-12 h-12 bg-black rounded-lg flex items-center justify-center">
               <Video className="h-6 w-6 text-yellow-400" />
@@ -353,8 +383,8 @@ const MentorSessions: React.FC = () => {
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm font-medium text-gray-600">Upcoming Sessions</p>
-              <p className="text-3xl font-bold text-gray-900">{upcomingSessions.length}</p>
+              <p className="text-sm font-medium text-gray-600">Total Participants</p>
+              <p className="text-3xl font-bold text-gray-900">{sessionStats.totalParticipants}</p>
             </div>
             <div className="w-12 h-12 bg-black rounded-lg flex items-center justify-center">
               <Users className="h-6 w-6 text-yellow-400" />
@@ -365,8 +395,8 @@ const MentorSessions: React.FC = () => {
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm font-medium text-gray-600">Total Sessions</p>
-              <p className="text-3xl font-bold text-gray-900">{activeSessions.length + upcomingSessions.length}</p>
+              <p className="text-sm font-medium text-gray-600">Session Hours</p>
+              <p className="text-3xl font-bold text-gray-900">{sessionStats.sessionHours.toFixed(1)}</p>
             </div>
             <div className="w-12 h-12 bg-black rounded-lg flex items-center justify-center">
               <Clock className="h-6 w-6 text-yellow-400" />
