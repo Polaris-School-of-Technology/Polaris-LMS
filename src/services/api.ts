@@ -129,23 +129,23 @@ async function refreshAccessToken(refreshToken: string): Promise<string> {
   return refreshTokenPromise;
 }
 
-// Live LMS API request function (only sends Authorization header)
+// Live LMS API request function
 async function lmsApiRequest(url: string, options: RequestInit = {}, token?: string): Promise<any> {
   const headers: Record<string, string> = {
     ...(options.headers as Record<string, string>),
   };
 
-  // Multimedia service requires token - validate it's provided
-  if (url.includes('multimedia') || url.includes('mm/v3')) {
-    if (!token) {
-      throw new Error('Token not provided');
-    }
-    headers['Authorization'] = `Bearer ${token}`;
-    headers['x-access-token'] = token;
-  } else if (token) {
-    // For LMS backend, only send Authorization header
-    headers['Authorization'] = `Bearer ${token}`;
-  }
+  // Multimedia service - token is optional (some routes are unsecured like /session/analytics)
+  // if (url.includes('multimedia') || url.includes('mm/v3')) {
+  //   if (token) {
+  //     headers['Authorization'] = `Bearer ${token}`;
+  //     headers['x-access-token'] = token;
+  //   }
+  //   // If no token provided, don't send auth headers (for unsecured routes)
+  // } else if (token) {
+  //   // For LMS backend, only send Authorization header
+  //   headers['Authorization'] = `Bearer ${token}`;
+  // }
 
   try {
     const response = await fetch(url, {
@@ -1347,14 +1347,16 @@ const multimediaApi = {
     },
 
     // Get session analytics from multimedia service (includes 50% threshold attendance)
-    getSessionAnalytics: async (sessionId: number, token: string) => {
+    // Note: No token required - route is unsecured
+    getSessionAnalytics: async (sessionId: number) => {
       const params = new URLSearchParams();
       params.append('sessionId', sessionId.toString());
 
       // MM_BASE_URL already contains /mm/v3, so we don't need to add it again
+      // No token required for unsecured route
       return lmsApiRequest(`${MM_BASE_URL}/session/analytics?${params.toString()}`, {
         method: 'GET',
-      }, token);
+      });
     },
   },
 };
@@ -1612,7 +1614,7 @@ export const useApi = () => {
         getCourseAttendance: (sessionId: number | null, courseId: number, search?: string, limit?: number, offset?: number) =>
           multimediaApi.attendance.getCourseAttendance(sessionId, courseId, token, search, limit || 20, offset || 0),
         getSessionAnalytics: (sessionId: number) =>
-          multimediaApi.attendance.getSessionAnalytics(sessionId, token),
+          multimediaApi.attendance.getSessionAnalytics(sessionId),
       },
     },
     dashboard: {
