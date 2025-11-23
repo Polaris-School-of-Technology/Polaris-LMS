@@ -718,6 +718,34 @@ const lmsApi = {
         };
       }
     },
+
+    getAttendance: async (token: string, includeHistory: boolean = false, historyLimit: number = 20) => {
+      const params = new URLSearchParams();
+      if (includeHistory) {
+        params.append('includeHistory', 'true');
+        params.append('historyLimit', historyLimit.toString());
+      }
+      const queryString = params.toString();
+      const url = `${LMS_BASE_URL}/api/v1/student/attendance${queryString ? `?${queryString}` : ''}`;
+      return apiRequest(url, {
+        method: 'GET',
+      }, token);
+    },
+
+    getAttendanceStats: async (token: string) => {
+      return apiRequest(`${LMS_BASE_URL}/api/v1/student/attendance/stats`, {
+        method: 'GET',
+      }, token);
+    },
+
+    getAttendanceHistory: async (token: string, limit: number = 50, offset: number = 0) => {
+      const params = new URLSearchParams();
+      params.append('limit', limit.toString());
+      params.append('offset', offset.toString());
+      return apiRequest(`${LMS_BASE_URL}/api/v1/student/attendance/history?${params.toString()}`, {
+        method: 'GET',
+      }, token);
+    },
   },
 
   mentors: {
@@ -1477,6 +1505,9 @@ export const useApi = () => {
         getAssignments: () => lmsApi.students.getAssignments(token),
         getAssignmentDetails: (assignmentId: string) => lmsApi.students.getAssignmentDetails(assignmentId, token),
         submitAssignment: (formData: FormData) => lmsApi.students.submitAssignment(formData, token),
+        getAttendance: (includeHistory?: boolean, historyLimit?: number) => lmsApi.students.getAttendance(token, includeHistory, historyLimit),
+        getAttendanceStats: () => lmsApi.students.getAttendanceStats(token),
+        getAttendanceHistory: (limit?: number, offset?: number) => lmsApi.students.getAttendanceHistory(token, limit, offset),
       },
       mentors: {
         getAll: () => lmsApi.mentors.getAll(token),

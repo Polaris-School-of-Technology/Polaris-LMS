@@ -868,18 +868,72 @@ const StudentProfile = () => {
     bio: 'Experienced React developer with 8+ years in the industry. Passionate about teaching modern web development and helping students achieve their goals.',
   };
 
-  const studentData = {
-    name: 'Alex Johnson',
-    email: 'alex.johnson@example.com',
+  // Student data state
+  const [studentData, setStudentData] = useState({
+    name: user?.name || 'Student',
+    email: user?.email || '',
     program: 'Open Source Development',
     enrolledPrograms: ['React.js', 'Node.js', 'Python', 'DevOps'],
-    avatar: 'AJ',
-    totalClasses: 24,
-    attendanceRate: 92,
-    completedAssignments: 18,
-    totalAssignments: 20,
-    githubContributions: 45,
-  };
+    avatar: user?.name?.charAt(0).toUpperCase() || 'S',
+    totalClasses: 0,
+    attendanceRate: 0,
+    completedAssignments: 0,
+    totalAssignments: 0,
+    githubContributions: 0,
+  });
+
+  // Attendance loading and error states
+  const [loadingAttendance, setLoadingAttendance] = useState(false);
+  const [attendanceError, setAttendanceError] = useState<string | null>(null);
+
+  // Fetch student attendance data
+  useEffect(() => {
+    const fetchStudentAttendance = async () => {
+      if (!user?.id) return;
+      
+      try {
+        setLoadingAttendance(true);
+        setAttendanceError(null);
+        
+        // Fetch attendance stats
+        const attendanceResponse = await api.lms.students.getAttendanceStats();
+        
+        if (attendanceResponse && attendanceResponse.success && attendanceResponse.data) {
+          const stats = attendanceResponse.data;
+          setStudentData(prev => ({
+            ...prev,
+            attendanceRate: stats.averageAttendance || stats.attendancePercentage || 0,
+            totalClasses: stats.totalSessions || 0,
+          }));
+        } else {
+          // Handle case where API returns success: false
+          setAttendanceError('Failed to fetch attendance data');
+          console.warn('Attendance API returned unsuccessful response:', attendanceResponse);
+        }
+      } catch (error: any) {
+        console.error('Error fetching student attendance:', error);
+        setAttendanceError(error?.message || 'Failed to load attendance data');
+        // Keep default values on error (already set to 0)
+      } finally {
+        setLoadingAttendance(false);
+      }
+    };
+
+    if (user?.id) {
+      // Initial fetch
+      fetchStudentAttendance();
+      
+      // Auto-refresh every 60 seconds to get updated attendance data
+      // Reduced from 30s to 60s for better performance in production
+      const refreshInterval = setInterval(() => {
+        fetchStudentAttendance();
+      }, 60000); // 60 seconds
+      
+      return () => {
+        clearInterval(refreshInterval);
+      };
+    }
+  }, [user?.id]); // Removed api.lms.students to prevent infinite loops
 
   const githubContributions: GitHubContribution[] = [
     {
@@ -1078,8 +1132,19 @@ const StudentProfile = () => {
                     </svg>
                   </span>
                 </div>
-                <div className="text-3xl font-bold text-white mb-1">{studentData.totalClasses}</div>
-                <div className="text-gray-400 text-sm">Total Classes</div>
+                {loadingAttendance ? (
+                  <div className="flex items-center gap-2">
+                    <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-white"></div>
+                    <div className="text-gray-400 text-sm">Loading...</div>
+                  </div>
+                ) : attendanceError ? (
+                  <div className="text-red-400 text-sm mb-1">{attendanceError}</div>
+                ) : (
+                  <>
+                    <div className="text-3xl font-bold text-white mb-1">{studentData.totalClasses}</div>
+                    <div className="text-gray-400 text-sm">Total Classes</div>
+                  </>
+                )}
               </div>
 
               <div className="bg-[#1a2332] rounded-xl p-6 border border-gray-800">
@@ -1114,8 +1179,19 @@ const StudentProfile = () => {
                     </svg>
                   </span>
                 </div>
-                <div className="text-3xl font-bold text-white mb-1">{studentData.attendanceRate}%</div>
-                <div className="text-gray-400 text-sm">Avg Attendance</div>
+                {loadingAttendance ? (
+                  <div className="flex items-center gap-2">
+                    <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-white"></div>
+                    <div className="text-gray-400 text-sm">Loading...</div>
+                  </div>
+                ) : attendanceError ? (
+                  <div className="text-red-400 text-sm mb-1">{attendanceError}</div>
+                ) : (
+                  <>
+                    <div className="text-3xl font-bold text-white mb-1">{studentData.attendanceRate}%</div>
+                    <div className="text-gray-400 text-sm">Avg Attendance</div>
+                  </>
+                )}
               </div>
             </div>
 
