@@ -714,6 +714,34 @@ const lmsApi = {
         };
       }
     },
+
+    getAttendance: async (includeHistory: boolean = false, historyLimit: number = 20) => {
+      const params = new URLSearchParams();
+      if (includeHistory) {
+        params.append('includeHistory', 'true');
+        params.append('historyLimit', historyLimit.toString());
+      }
+      const queryString = params.toString();
+      const url = `${LMS_BASE_URL}/api/v1/student/attendance${queryString ? `?${queryString}` : ''}`;
+      return apiRequest(url, {
+        method: 'GET',
+      });
+    },
+
+    getAttendanceStats: async () => {
+      return apiRequest(`${LMS_BASE_URL}/api/v1/student/attendance/stats`, {
+        method: 'GET',
+      });
+    },
+
+    getAttendanceHistory: async (limit: number = 50, offset: number = 0) => {
+      const params = new URLSearchParams();
+      params.append('limit', limit.toString());
+      params.append('offset', offset.toString());
+      return apiRequest(`${LMS_BASE_URL}/api/v1/student/attendance/history?${params.toString()}`, {
+        method: 'GET',
+      });
+    },
   },
 
   mentors: {
@@ -1119,7 +1147,7 @@ const multimediaApi = {
       }, token);
     },
 
-    getEndedSessions: async (token: string, batchId?: number, facultyId?: string, limit: number = 50, offset: number = 0) => {
+    getEndedSessions: async (batchId?: number, facultyId?: string, limit: number = 50, offset: number = 0) => {
       const params = new URLSearchParams();
       if (batchId) params.append('batchId', batchId.toString());
       if (facultyId) params.append('facultyId', facultyId);
@@ -1128,7 +1156,7 @@ const multimediaApi = {
       
       return lmsApiRequest(`${MM_BASE_URL}/liveclass/session/ended?${params.toString()}`, {
         method: 'GET',
-      }, token);
+      });
     },
 
     getStats: async (token: string) => {
@@ -1284,7 +1312,7 @@ const multimediaApi = {
 
   attendance: {
     // Get session attendance from multimedia service
-    getSessionAttendance: async (sessionId: number, token: string, batchId?: number, courseId?: number, search?: string, limit: number = 20, offset: number = 0) => {
+    getSessionAttendance: async (sessionId: number, batchId?: number, courseId?: number, search?: string, limit: number = 20, offset: number = 0) => {
       const params = new URLSearchParams();
       if (sessionId) params.append('sessionId', sessionId.toString());
       if (batchId) params.append('batchId', batchId.toString());
@@ -1296,11 +1324,11 @@ const multimediaApi = {
       // MM_BASE_URL already contains /mm/v3
       return lmsApiRequest(`${MM_BASE_URL}/session/attendance?${params.toString()}`, {
         method: 'GET',
-      }, token);
+      });
     },
 
     // Get course attendance from multimedia service
-    getCourseAttendance: async (sessionId: number | null, courseId: number, token: string, search?: string, limit: number = 20, offset: number = 0) => {
+    getCourseAttendance: async (sessionId: number | null, courseId: number, search?: string, limit: number = 20, offset: number = 0) => {
       const params = new URLSearchParams();
       params.append('entityId', courseId.toString());
       if (sessionId) params.append('liveSessionId', sessionId.toString());
@@ -1311,18 +1339,18 @@ const multimediaApi = {
       // MM_BASE_URL already contains /mm/v3
       return lmsApiRequest(`${MM_BASE_URL}/session/course/attendance?${params.toString()}`, {
         method: 'GET',
-      }, token);
+      });
     },
 
     // Get session analytics from multimedia service (includes 50% threshold attendance)
-    getSessionAnalytics: async (sessionId: number, token: string) => {
+    getSessionAnalytics: async (sessionId: number) => {
       const params = new URLSearchParams();
       params.append('sessionId', sessionId.toString());
 
       // MM_BASE_URL already contains /mm/v3, so we don't need to add it again
       return lmsApiRequest(`${MM_BASE_URL}/session/analytics?${params.toString()}`, {
         method: 'GET',
-      }, token);
+      });
     },
   },
 };
@@ -1478,6 +1506,9 @@ export const useApi = () => {
         getAssignments: () => lmsApi.students.getAssignments(token),
         getAssignmentDetails: (assignmentId: string) => lmsApi.students.getAssignmentDetails(assignmentId, token),
         submitAssignment: (formData: FormData) => lmsApi.students.submitAssignment(formData, token),
+        getAttendance: (includeHistory?: boolean, historyLimit?: number) => lmsApi.students.getAttendance(includeHistory, historyLimit),
+        getAttendanceStats: () => lmsApi.students.getAttendanceStats(),
+        getAttendanceHistory: (limit?: number, offset?: number) => lmsApi.students.getAttendanceHistory(limit, offset),
       },
       mentors: {
         getAll: () => lmsApi.mentors.getAll(token),
@@ -1561,7 +1592,7 @@ export const useApi = () => {
       sessions: {
         getAll: () => multimediaApi.sessions.getAll(token),
         getEndedSessions: (batchId?: number, facultyId?: string, limit?: number, offset?: number) =>
-          multimediaApi.sessions.getEndedSessions(token, batchId, facultyId, limit || 50, offset || 0),
+          multimediaApi.sessions.getEndedSessions(batchId, facultyId, limit || 50, offset || 0),
         getStats: () => multimediaApi.sessions.getStats(token),
         getUpcoming: () => multimediaApi.sessions.getUpcoming(token),
         startSession: (sessionId: number, facultyId: string, batchId: number, facultyName: string) =>
@@ -1578,11 +1609,11 @@ export const useApi = () => {
       },
       attendance: {
         getSessionAttendance: (sessionId: number, batchId?: number, courseId?: number, search?: string, limit?: number, offset?: number) =>
-          multimediaApi.attendance.getSessionAttendance(sessionId, token, batchId, courseId, search, limit || 20, offset || 0),
+          multimediaApi.attendance.getSessionAttendance(sessionId, batchId, courseId, search, limit || 20, offset || 0),
         getCourseAttendance: (sessionId: number | null, courseId: number, search?: string, limit?: number, offset?: number) =>
-          multimediaApi.attendance.getCourseAttendance(sessionId, courseId, token, search, limit || 20, offset || 0),
+          multimediaApi.attendance.getCourseAttendance(sessionId, courseId, search, limit || 20, offset || 0),
         getSessionAnalytics: (sessionId: number) =>
-          multimediaApi.attendance.getSessionAnalytics(sessionId, token),
+          multimediaApi.attendance.getSessionAnalytics(sessionId),
       },
     },
     dashboard: {
