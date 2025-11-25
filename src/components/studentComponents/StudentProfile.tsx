@@ -947,8 +947,8 @@ const StudentProfile = () => {
         setLoadingAttendance(true);
         setAttendanceError(null);
         
-        // Fetch attendance stats
-        const attendanceResponse = await api.lms.students.getAttendanceStats();
+        // Fetch attendance stats with userId
+        const attendanceResponse = await api.lms.students.getAttendanceStats(user.id);
         
         if (attendanceResponse && attendanceResponse.success && attendanceResponse.data) {
           const stats = attendanceResponse.data;

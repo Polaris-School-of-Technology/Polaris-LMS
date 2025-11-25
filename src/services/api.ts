@@ -715,8 +715,9 @@ const lmsApi = {
       }
     },
 
-    getAttendance: async (includeHistory: boolean = false, historyLimit: number = 20) => {
+    getAttendance: async (userId: string, includeHistory: boolean = false, historyLimit: number = 20) => {
       const params = new URLSearchParams();
+      params.append('userId', userId);
       if (includeHistory) {
         params.append('includeHistory', 'true');
         params.append('historyLimit', historyLimit.toString());
@@ -728,14 +729,15 @@ const lmsApi = {
       });
     },
 
-    getAttendanceStats: async () => {
-      return apiRequest(`${LMS_BASE_URL}/api/v1/student/attendance/stats`, {
+    getAttendanceStats: async (userId: string) => {
+      return apiRequest(`${LMS_BASE_URL}/api/v1/student/attendance/stats?userId=${userId}`, {
         method: 'GET',
       });
     },
 
-    getAttendanceHistory: async (limit: number = 50, offset: number = 0) => {
+    getAttendanceHistory: async (userId: string, limit: number = 50, offset: number = 0) => {
       const params = new URLSearchParams();
+      params.append('userId', userId);
       params.append('limit', limit.toString());
       params.append('offset', offset.toString());
       return apiRequest(`${LMS_BASE_URL}/api/v1/student/attendance/history?${params.toString()}`, {
@@ -1051,16 +1053,16 @@ const lmsApi = {
       }, token);
     },
 
-    getWeeklyAttendanceStats: async (token: string) => {
-      return lmsApiRequest(`${LMS_BASE_URL}/api/v1/admin/students/weekly-attendance-stats`, {
+    getWeeklyAttendanceStats: async () => {
+      return apiRequest(`${LMS_BASE_URL}/api/v1/admin/students/weekly-attendance-stats`, {
         method: 'GET',
-      }, token);
+      });
     },
 
-    getStudentPerformance: async (page: number = 1, limit: number = 10, token: string) => {
-      return lmsApiRequest(`${LMS_BASE_URL}/api/v1/admin/students/performance?page=${page}&limit=${limit}`, {
+    getStudentPerformance: async () => {
+      return apiRequest(`${LMS_BASE_URL}/api/v1/admin/students/performance`, {
         method: 'GET',
-      }, token);
+      });
     },
   },
 
@@ -1506,9 +1508,9 @@ export const useApi = () => {
         getAssignments: () => lmsApi.students.getAssignments(token),
         getAssignmentDetails: (assignmentId: string) => lmsApi.students.getAssignmentDetails(assignmentId, token),
         submitAssignment: (formData: FormData) => lmsApi.students.submitAssignment(formData, token),
-        getAttendance: (includeHistory?: boolean, historyLimit?: number) => lmsApi.students.getAttendance(includeHistory, historyLimit),
-        getAttendanceStats: () => lmsApi.students.getAttendanceStats(),
-        getAttendanceHistory: (limit?: number, offset?: number) => lmsApi.students.getAttendanceHistory(limit, offset),
+        getAttendance: (userId: string, includeHistory?: boolean, historyLimit?: number) => lmsApi.students.getAttendance(userId, includeHistory, historyLimit),
+        getAttendanceStats: (userId: string) => lmsApi.students.getAttendanceStats(userId),
+        getAttendanceHistory: (userId: string, limit?: number, offset?: number) => lmsApi.students.getAttendanceHistory(userId, limit, offset),
       },
       mentors: {
         getAll: () => lmsApi.mentors.getAll(token),
@@ -1569,8 +1571,8 @@ export const useApi = () => {
       },
       adminStudents: {
         bulkUploadStudents: (formData: FormData) => lmsApi.adminStudents.bulkUploadStudents(formData, token),
-        getWeeklyAttendanceStats: () => lmsApi.adminStudents.getWeeklyAttendanceStats(token),
-        getStudentPerformance: (page: number, limit: number) => lmsApi.adminStudents.getStudentPerformance(page, limit, token),
+        getWeeklyAttendanceStats: () => lmsApi.adminStudents.getWeeklyAttendanceStats(),
+        getStudentPerformance: () => lmsApi.adminStudents.getStudentPerformance(),
       },
       adminMentorData: {
         getMentorStats: () => lmsApi.adminMentorData.getMentorStats(token),

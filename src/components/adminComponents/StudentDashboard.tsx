@@ -48,21 +48,22 @@ const StudentDashboard: React.FC = () => {
       setLoading(true);
       setError(null);
 
-      // Fetch paginated student performance data
-      const studentPerformanceResponse = await api.lms.adminStudents.getStudentPerformance(
-        currentPage,
-        studentsPerPage
-      );
+      // Fetch all student performance data (no pagination)
+      const studentPerformanceResponse = await api.lms.adminStudents.getStudentPerformance();
       
       const studentsResponse = studentPerformanceResponse.data || [];
-      const pagination = studentPerformanceResponse.pagination || {};
 
-      // Update pagination metadata
-      setTotalRecords(pagination.totalRecords || 0);
-      setTotalPages(pagination.totalPages || 1);
+      // Update total records
+      setTotalRecords(studentsResponse.length);
+      setTotalPages(Math.ceil(studentsResponse.length / studentsPerPage));
+      
+      // Apply client-side pagination
+      const startIndex = (currentPage - 1) * studentsPerPage;
+      const endIndex = startIndex + studentsPerPage;
+      const paginatedStudents = studentsResponse.slice(startIndex, endIndex);
       
       // Transform student data
-      const transformedStudents: StudentMetric[] = studentsResponse.map((student: any) => ({
+      const transformedStudents: StudentMetric[] = paginatedStudents.map((student: any) => ({
         id: student.student_id || student.id,
         name: student.name || 'Unknown Student',
         rollNo: student.roll_number || 'N/A',
