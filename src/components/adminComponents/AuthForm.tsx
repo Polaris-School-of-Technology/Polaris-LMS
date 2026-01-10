@@ -53,7 +53,7 @@ const AuthForm: React.FC<AuthFormProps> = ({ userType, onLogin }) => {
           emailRestriction: 'Admin access is restricted to authorized personnel',
           allowSignup: false,
           googleOnly: false,
-          allowGoogleAuth: true
+          allowGoogleAuth: false
         };
     }
   };
