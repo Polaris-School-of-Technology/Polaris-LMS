@@ -1,70 +1,84 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Search, Filter, Play, Download, Calendar, Clock, Users, Eye } from 'lucide-react';
+import { useApi } from '../../services/api';
+import { useAuth } from '../../contexts/AuthContext';
+
+interface Recording {
+  id: number;
+  title: string;
+  program: string;
+  cohort: string;
+  date: string;
+  duration: string;
+  participants: number;
+  views: number;
+  size: string;
+  thumbnail: string;
+  status: string;
+  batch_id: number;
+}
 
 const MentorRecordings: React.FC = () => {
+  const api = useApi();
+  const { token } = useAuth();
   const [searchTerm, setSearchTerm] = useState('');
   const [filterProgram, setFilterProgram] = useState('all');
   const [filterDate, setFilterDate] = useState('all');
+  const [recordings, setRecordings] = useState<Recording[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  const recordings = [
-    {
-      id: 1,
-      title: 'React Fundamentals - Components & Props',
-      program: 'Full Stack Development',
-      cohort: '2024-A',
-      date: '2024-01-15',
-      duration: '2h 15m',
-      participants: 8,
-      views: 24,
-      size: '1.2 GB',
-      thumbnail: 'https://images.pexels.com/photos/574071/pexels-photo-574071.jpeg?auto=compress&cs=tinysrgb&w=300&h=200&fit=crop',
-      status: 'processed'
-    },
-    {
-      id: 2,
-      title: 'State Management with Redux',
-      program: 'Full Stack Development',
-      cohort: '2024-A',
-      date: '2024-01-14',
-      duration: '1h 45m',
-      participants: 8,
-      views: 18,
-      size: '950 MB',
-      thumbnail: 'https://images.pexels.com/photos/1181263/pexels-photo-1181263.jpeg?auto=compress&cs=tinysrgb&w=300&h=200&fit=crop',
-      status: 'processed'
-    },
-    {
-      id: 3,
-      title: 'JavaScript ES6+ Features Deep Dive',
-      program: 'Full Stack Development',
-      cohort: '2024-B',
-      date: '2024-01-13',
-      duration: '2h 30m',
-      participants: 6,
-      views: 31,
-      size: '1.4 GB',
-      thumbnail: 'https://images.pexels.com/photos/1181298/pexels-photo-1181298.jpeg?auto=compress&cs=tinysrgb&w=300&h=200&fit=crop',
-      status: 'processed'
-    },
-    {
-      id: 4,
-      title: 'API Integration Workshop',
-      program: 'Full Stack Development',
-      cohort: '2024-A',
-      date: '2024-01-12',
-      duration: '1h 30m',
-      participants: 7,
-      views: 15,
-      size: '800 MB',
-      thumbnail: 'https://images.pexels.com/photos/1181244/pexels-photo-1181244.jpeg?auto=compress&cs=tinysrgb&w=300&h=200&fit=crop',
-      status: 'processing'
-    }
-  ];
+  useEffect(() => {
+    const fetchRecordings = async () => {
+      if (!token) return;
+
+      try {
+        setLoading(true);
+        const resp = await api.lms.mentors.getFacultyStudents();
+        const data = Array.isArray(resp) ? resp : (resp?.data ?? []);
+
+        const excludedBatches = [1, 5, 6, 7];
+        const filteredData = (data as any[]).filter((s: any) => !excludedBatches.includes(Number(s.batch_id)));
+
+        const mappedRecordings: Recording[] = filteredData.map((s: any) => {
+          const rawDt = s.session_datetime ?? s.sessionDate ?? s.dateTime ?? s.datetime;
+          const dt = rawDt ? new Date(rawDt) : new Date();
+
+          // Only show past sessions as recordings
+          if (dt > new Date()) return null;
+
+          return {
+            id: Number(s.session_id ?? s.id ?? Date.now()),
+            title: s.course_name ?? s.title ?? 'Untitled Session',
+            program: s.course_name ?? 'General',
+            cohort: s.course_code ?? s.cohort ?? 'Unknown Cohort',
+            date: dt.toISOString().split('T')[0],
+            duration: `${s.duration ?? 60}m`,
+            participants: Number(s.student_count ?? s.students ?? 0),
+            views: Math.floor(Math.random() * 50), // Mock views
+            size: '0 MB', // Mock size
+            thumbnail: 'https://images.pexels.com/photos/1181244/pexels-photo-1181244.jpeg?auto=compress&cs=tinysrgb&w=300&h=200&fit=crop',
+            status: 'processed',
+            batch_id: Number(s.batch_id)
+          };
+        }).filter(Boolean) as Recording[];
+
+        setRecordings(mappedRecordings);
+      } catch (err) {
+        console.error('Failed to fetch recordings:', err);
+        setError('Failed to load recordings');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchRecordings();
+  }, [token]);
 
   const filteredRecordings = recordings.filter(recording => {
     const matchesSearch = recording.title.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesProgram = filterProgram === 'all' || recording.program === filterProgram;
-    const matchesDate = filterDate === 'all' || 
+    const matchesDate = filterDate === 'all' ||
       (filterDate === 'week' && new Date(recording.date) >= new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)) ||
       (filterDate === 'month' && new Date(recording.date) >= new Date(Date.now() - 30 * 24 * 60 * 60 * 1000));
     return matchesSearch && matchesProgram && matchesDate;
@@ -82,6 +96,14 @@ const MentorRecordings: React.FC = () => {
         return 'bg-gray-100 text-gray-800';
     }
   };
+
+  if (loading) {
+    return <div className="flex justify-center items-center h-64 text-gray-500">Loading recordings...</div>;
+  }
+
+  if (error) {
+    return <div className="flex justify-center items-center h-64 text-red-500">{error}</div>;
+  }
 
   return (
     <div className="space-y-6">
@@ -142,8 +164,8 @@ const MentorRecordings: React.FC = () => {
         {filteredRecordings.map((recording) => (
           <div key={recording.id} className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden hover:shadow-md transition-shadow duration-200">
             <div className="relative">
-              <img 
-                src={recording.thumbnail} 
+              <img
+                src={recording.thumbnail}
                 alt={recording.title}
                 className="w-full h-48 object-cover"
               />
@@ -162,16 +184,16 @@ const MentorRecordings: React.FC = () => {
                 {recording.duration}
               </div>
             </div>
-            
+
             <div className="p-4">
               <h3 className="font-semibold text-gray-900 mb-2 line-clamp-2">{recording.title}</h3>
-              
+
               <div className="space-y-2 text-sm text-gray-600 mb-4">
                 <div className="flex items-center justify-between">
                   <span className="font-medium">{recording.program}</span>
                   <span>Cohort {recording.cohort}</span>
                 </div>
-                
+
                 <div className="flex items-center space-x-4">
                   <div className="flex items-center space-x-1">
                     <Calendar className="h-3 w-3" />
@@ -182,7 +204,7 @@ const MentorRecordings: React.FC = () => {
                     <span>{recording.participants}</span>
                   </div>
                 </div>
-                
+
                 <div className="flex items-center justify-between">
                   <div className="flex items-center space-x-1">
                     <Eye className="h-3 w-3" />
@@ -191,7 +213,7 @@ const MentorRecordings: React.FC = () => {
                   <span className="text-xs text-gray-500">{recording.size}</span>
                 </div>
               </div>
-              
+
               <div className="flex items-center justify-between">
                 <button className="flex items-center space-x-2 text-sm text-gray-600 hover:text-gray-800 transition-colors duration-200">
                   <Play className="h-4 w-4" />
@@ -220,7 +242,7 @@ const MentorRecordings: React.FC = () => {
             </div>
           </div>
         </div>
-        
+
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
           <div className="flex items-center justify-between">
             <div>
@@ -232,7 +254,7 @@ const MentorRecordings: React.FC = () => {
             </div>
           </div>
         </div>
-        
+
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
           <div className="flex items-center justify-between">
             <div>
@@ -244,7 +266,7 @@ const MentorRecordings: React.FC = () => {
             </div>
           </div>
         </div>
-        
+
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
           <div className="flex items-center justify-between">
             <div>

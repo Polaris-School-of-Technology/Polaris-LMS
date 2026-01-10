@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { Calendar, Video, FileText, Github, Award, Clock, Users, BookOpen, PlayCircle, CheckCircle, AlertCircle, Upload, File, X, Mail, Phone, Briefcase, User, ChevronDown, LogOut, Settings } from 'lucide-react';
+import { Calendar, Video, FileText, Github, Award, Clock, Users, BookOpen, PlayCircle, CheckCircle, AlertCircle, Upload, X, LogOut, User, ChevronDown } from 'lucide-react';
 
 import { useApi } from '../../services/api';
 import { useAuth } from '../../contexts/AuthContext';
@@ -118,19 +118,13 @@ interface UploadedFile {
   program: string;
 }
 
-interface MentorInfo {
-  name: string;
-  photo: string;
-  email: string;
-  phone: string;
-  department: string;
-  bio: string;
-}
+
 
 const StudentProfile = () => {
   const api = useApi();
   const { user, logout } = useAuth();
-  const [showUserDropdown, setShowUserDropdown] = useState(false);
+  const [userBatchId, setUserBatchId] = useState<number | null>(user?.batchId || null);
+  const [showDropdown, setShowDropdown] = useState(false);
   const [activeTab, setActiveTab] = useState<'overview' | 'schedule' | 'recordings' | 'assignments' | 'contributions'>('overview');
   const [showUploadModal, setShowUploadModal] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
@@ -197,9 +191,20 @@ const StudentProfile = () => {
     return 'pending';
   };
 
-  // Add after other state declarations
   const [showVideoPlayer, setShowVideoPlayer] = useState(false);
   const [selectedRecording, setSelectedRecording] = useState<Recording | null>(null);
+
+  useEffect(() => {
+    if (user?.batchId) {
+      setUserBatchId(user.batchId);
+      return;
+    }
+
+    // NOTE: The profile endpoint is returning 404. We are relying on user.batchId from the token.
+    if (!user?.batchId) {
+      console.warn('Batch ID missing from user token. Batch exclusion filtering may not work correctly.');
+    }
+  }, [api.ums, user?.batchId]);
 
   const mapAssignmentFromApi = (item: any): StudentAssignmentListItem => {
     const assignmentData = item?.assignments || {};
@@ -262,17 +267,12 @@ const StudentProfile = () => {
 
   const formatRecordingDate = (dateString: string): string => {
     const date = new Date(dateString);
-    return date.toLocaleDateString('en-US', { 
-      month: 'short', 
-      day: 'numeric', 
-      year: 'numeric' 
+    return date.toLocaleDateString('en-US', {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric'
     });
   };
-
-  // const handlePlayRecording = (recording: Recording) => {
-  //   const playlistUrl = `https://prod-video-transcoding.polariscampus.com/v1/vod/sessions/${recording.sessionId}/master-playlist`;
-  //   window.open(playlistUrl, '_blank');
-  // };
 
   const handlePlayRecording = (recording: Recording) => {
     setSelectedRecording(recording);
@@ -332,45 +332,59 @@ const StudentProfile = () => {
   }, [api.lms.students]);
 
   // Fetch recordings
-    useEffect(() => {
-      const fetchRecordings = async () => {
-        if (!user?.id) return;
-        
-        try {
-          setLoadingRecordings(true);
-          setRecordingsError(null);
-          
-          // Use the working student ID as fallback for testing
-          const testStudentId = '08faa382-56d6-4a7c-9482-ef6efdfa5bea';
-          const studentIdToUse = user.id || testStudentId;
-          
-          console.log('Fetching recordings for student:', studentIdToUse);
-          
-          const response: RecordingsResponse = await api.ums.students.getRecordings(studentIdToUse);
-          
-          if (response.status === 'success' && response.data.recordings) {
-            setRecordings(response.data.recordings);
-          } else {
-            setRecordingsError('Failed to fetch recordings');
-          }
-        } catch (err: any) {
-          console.error('Error fetching recordings:', err);
-          
-          // Show user-friendly error message
-          if (err?.message?.includes('multiple (or no) rows returned')) {
-            setRecordingsError('This student has multiple batches. Please contact support.');
-          } else if (err?.message?.includes('500')) {
-            setRecordingsError('Server error while fetching recordings. Please try again later.');
-          } else {
-            setRecordingsError(err?.message || 'Failed to load recordings');
-          }
-        } finally {
-          setLoadingRecordings(false);
-        }
-      };
+  useEffect(() => {
+    const fetchRecordings = async () => {
+      if (!user?.id) return;
 
-      fetchRecordings();
-    }, [user?.id, api.ums.students]);
+      try {
+        setLoadingRecordings(true);
+        setRecordingsError(null);
+
+        // Use the working student ID as fallback for testing
+        const testStudentId = '08faa382-56d6-4a7c-9482-ef6efdfa5bea';
+        const studentIdToUse = user.id || testStudentId;
+
+        const response: RecordingsResponse = await api.ums.students.getRecordings(studentIdToUse);
+
+        if (response.status === 'success' && Array.isArray(response.data.recordings)) {
+          // Filter out recordings from excluded batches
+          const excludedBatches = [1, 5, 6, 7];
+          const filteredRecordings = response.data.recordings.filter(
+            (rec) => {
+              let bId = Number(rec.batchId);
+
+              // Fallback to user's batch ID if recording doesn't have one
+              if (isNaN(bId) && userBatchId) {
+                bId = userBatchId;
+              }
+
+              const shouldExclude = excludedBatches.includes(bId);
+              // console.log(`Recording ${rec.id} Batch: ${bId} Exclude: ${shouldExclude}`);
+              return !shouldExclude;
+            }
+          );
+          setRecordings(filteredRecordings);
+        } else {
+          setRecordingsError('Failed to fetch recordings');
+        }
+      } catch (err: any) {
+        console.error('Error fetching recordings:', err);
+
+        // Show user-friendly error message
+        if (err?.message?.includes('multiple (or no) rows returned')) {
+          setRecordingsError('This student has multiple batches. Please contact support.');
+        } else if (err?.message?.includes('500')) {
+          setRecordingsError('Server error while fetching recordings. Please try again later.');
+        } else {
+          setRecordingsError(err?.message || 'Failed to load recordings');
+        }
+      } finally {
+        setLoadingRecordings(false);
+      }
+    };
+
+    fetchRecordings();
+  }, [user?.id, api.ums.students, userBatchId]);
 
   const loadAssignmentDetail = async (assignmentId: string) => {
     setAssignmentDetailLoading(true);
@@ -463,13 +477,13 @@ const StudentProfile = () => {
       console.log('📡 Calling submitAssignment API...');
       const response = await api.lms.students.submitAssignment(formData);
       console.log('✅ Submit response:', response);
-      
+
       const successMessage = response?.message || response?.data?.message || 'Assignment submitted successfully';
       setAssignmentSuccessMessage(successMessage);
       setDetailUploadFile(null);
 
       await loadAssignmentDetail(selectedAssignment.assignmentId);
-      
+
       try {
         const refresh = await api.lms.students.getAssignments();
         const raw = Array.isArray(refresh?.data) ? refresh.data : [];
@@ -518,9 +532,9 @@ const StudentProfile = () => {
     setSelectedFileType('Assignment');
   };
 
-  const handleDeleteFile = (fileId: string) => {
-    setUploadedFiles(uploadedFiles.filter(file => file.id !== fileId));
-  };
+
+
+
 
   const fetchClassSchedule = useCallback(
     async (silent: boolean = false) => {
@@ -539,7 +553,23 @@ const StudentProfile = () => {
           throw new Error(response.error || 'Failed to fetch class schedule');
         }
 
-        const data = Array.isArray(response) ? response : response?.data || [];
+        let data = Array.isArray(response) ? response : response?.data || [];
+
+        // Filter out excluded batches
+        const excludedBatches = [1, 5, 6, 7];
+        data = data.filter((s: any) => {
+          let bId = Number(s.batch_id || s.batchId);
+
+          // Fallback to user's batch ID if session doesn't have one
+          if (isNaN(bId) && userBatchId) {
+            bId = userBatchId;
+          }
+
+          const shouldExclude = excludedBatches.includes(bId);
+          // console.log(`Session ${s.id} Batch: ${bId} Exclude: ${shouldExclude}`);
+          return !shouldExclude;
+        });
+
         const now = new Date();
 
         const mapped: UpcomingClass[] = data.map((s: any) => {
@@ -667,7 +697,6 @@ const StudentProfile = () => {
           }
 
           try {
-            // Status check logic commented out
           } catch (statusError) {
             const responseStatus = (statusError as any)?.response?.status ?? (statusError as any)?.status;
             if (responseStatus === 404 || responseStatus === 400 || responseStatus === 410) {
@@ -692,7 +721,7 @@ const StudentProfile = () => {
         setRefreshingSchedule(false);
       }
     },
-    [api.lms.students]
+    [api.lms.students, userBatchId]
   );
 
   useEffect(() => {
@@ -747,6 +776,38 @@ const StudentProfile = () => {
   const goNextUpcoming = () => setUpcomingPage(p => Math.min(upcomingTotalPages, p + 1));
   const goPrevSchedule = () => setSchedulePage(p => Math.max(1, p - 1));
   const goNextSchedule = () => setSchedulePage(p => Math.min(scheduleTotalPages, p + 1));
+
+  const handleAddToCalendar = (classItem: UpcomingClass, e?: React.MouseEvent<HTMLButtonElement>) => {
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+
+    if (!classItem.epoch || classItem.epoch <= Date.now()) {
+      return;
+    }
+
+    // Create calendar event
+    const startDate = new Date(classItem.epoch);
+    const duration = parseInt(classItem.duration?.replace(' min', '') || '60');
+    const endDate = new Date(startDate.getTime() + duration * 60000);
+
+    const formatDate = (date: Date) => {
+      return date.toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z';
+    };
+
+    const title = encodeURIComponent(classItem.title || 'Live Class');
+    const description = encodeURIComponent(
+      `${classItem.program || ''}${classItem.mentor ? ` - ${classItem.mentor}` : ''}`
+    );
+    const location = encodeURIComponent('Online');
+    const startDateStr = formatDate(startDate);
+    const endDateStr = formatDate(endDate);
+
+    const googleCalendarUrl = `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${title}&dates=${startDateStr}/${endDateStr}&details=${description}&location=${location}`;
+
+    window.open(googleCalendarUrl, '_blank', 'noopener,noreferrer');
+  };
 
   const handleJoinLiveClass = async (classItem: UpcomingClass, e?: React.MouseEvent<HTMLButtonElement>) => {
     if (e) {
@@ -847,7 +908,7 @@ const StudentProfile = () => {
         setIsJoiningSession(false);
         setTimeout(() => {
           if (!window.location.pathname.includes('/student/login') &&
-              !window.location.pathname.includes('/login')) {
+            !window.location.pathname.includes('/login')) {
             window.location.replace('/student/login');
           }
         }, 100);
@@ -859,14 +920,7 @@ const StudentProfile = () => {
     }
   };
 
-  const mentorInfo: MentorInfo = {
-    name: 'Sarah Mitchell',
-    photo: 'https://storage.googleapis.com/polaris-tech_cloudbuild/image_Mentor.jpg',
-    email: 'sarah.mitchell@academy.com',
-    phone: '+1 (555) 123-4567',
-    department: 'Frontend Development',
-    bio: 'Experienced React developer with 8+ years in the industry. Passionate about teaching modern web development and helping students achieve their goals.',
-  };
+
 
   const studentData = {
     name: 'Alex Johnson',
@@ -913,97 +967,60 @@ const StudentProfile = () => {
   const detailDueDate = assignmentDetail?.assignment?.due_date || selectedAssignment?.dueDate || null;
   const detailProgram = assignmentDetail?.assignment?.courses?.course_code || selectedAssignment?.program || '—';
   const detailBatch = assignmentDetail?.assignment?.batches?.batch_name || selectedAssignment?.batchName || null;
-  const detailTotalMarks = assignmentDetail?.assignment?.total_marks ?? selectedAssignment?.totalMarks ?? null;
+
 
   return (
     <div className="min-h-screen bg-[#0A0E1A]">
-      <nav className="bg-[#0A0E1A] border-b border-gray-800 px-8 py-4">
-        <div className="max-w-7xl mx-auto flex items-center justify-between">
-          <div className="flex items-center gap-8">
-            <div className="flex items-center gap-2">
-              <div className="w-8 h-8 rounded-lg bg-[#FFC540] flex items-center justify-center">
-                <span className="text-black font-bold text-sm">P</span>
-              </div>
-              <span className="text-white font-bold text-lg">Plarislabs <span className="text-gray-500 text-sm">2.0</span></span>
-            </div>
-            <div className="flex gap-4">
-              <button className="px-4 py-2 bg-[#FFC540] text-black rounded-lg font-medium text-sm">
-                Programs
-              </button>
-              <button className="px-4 py-2 text-gray-400 hover:text-white font-medium text-sm">
-                Mentors
-              </button>
-              <button className="px-4 py-2 text-gray-400 hover:text-white font-medium text-sm">
-                Students
-              </button>
-              <button className="px-4 py-2 text-gray-400 hover:text-white font-medium text-sm">
-                Reports
-              </button>
+
+
+      <nav className="bg-[#1a2332] border-b border-gray-800 sticky top-0 z-50">
+        <div className="max-w-7xl mx-auto px-8 py-4 flex items-center justify-between">
+          <div className="flex items-center space-x-8">
+            <div>
+              <h1 className="text-xl font-bold text-[#FFC540]">Polaris Labs</h1>
+              <p className="text-gray-400 text-sm">Student Portal</p>
             </div>
           </div>
-          <div className="flex items-center gap-4">
-            <div className="relative">
-              <input
-                type="text"
-                placeholder="Search..."
-                className="bg-[#1a2332] text-white placeholder-gray-500 px-4 py-2 rounded-lg w-64 text-sm focus:outline-none focus:ring-2 focus:ring-[#FFC540]"
-              />
-            </div>
-            <div className="relative">
-              <button className="text-gray-400 hover:text-white">
-                <div className="relative">
-                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
-                  </svg>
-                  <span className="absolute -top-1 -right-1 bg-[#FFC540] text-black text-xs rounded-full w-5 h-5 flex items-center justify-center font-bold">3</span>
-                </div>
-              </button>
-            </div>
-            <div className="relative">
-              <button
-                onClick={() => setShowUserDropdown(!showUserDropdown)}
-                className="flex items-center space-x-2 hover:bg-gray-800/50 rounded-lg px-3 py-2 transition-colors duration-200"
-                aria-haspopup="true"
-                aria-expanded={showUserDropdown}
-              >
-                <div className="w-8 h-8 bg-[#FFC540] rounded-full flex items-center justify-center">
-                  <User className="w-4 h-4 text-black" />
-                </div>
-                <ChevronDown className={`w-4 h-4 text-gray-400 transition-transform ${showUserDropdown ? 'rotate-180' : ''}`} />
-              </button>
 
-              {showUserDropdown && (
-                <>
-                  <div
-                    className="fixed inset-0 z-10"
-                    onClick={() => setShowUserDropdown(false)}
-                  />
+          {/* User Profile Dropdown */}
+          <div className="relative">
+            <button
+              onClick={() => setShowDropdown(!showDropdown)}
+              className="flex items-center space-x-2 hover:bg-gray-700 rounded-lg px-2 py-1 transition-colors duration-200"
+            >
+              <div className="w-8 h-8 bg-[#FFC540] rounded-full flex items-center justify-center">
+                <User className="h-4 w-4 text-black" />
+              </div>
+              <ChevronDown className="h-4 w-4 text-gray-400" />
+            </button>
 
-                  <div className="absolute right-0 mt-2 w-64 bg-[#1a2332] border border-gray-700 rounded-lg shadow-lg z-20">
-                    <div className="px-4 py-3 border-b border-gray-700">
-                      <p className="text-sm font-semibold text-white">{user?.name || 'Student'}</p>
-                      <p className="text-xs text-gray-400">{user?.email || ''}</p>
-                    </div>
+            {/* Dropdown Menu */}
+            {showDropdown && (
+              <>
+                {/* Backdrop to close dropdown */}
+                <div
+                  className="fixed inset-0 z-10"
+                  onClick={() => setShowDropdown(false)}
+                />
 
-                    <div className="py-2">
-                      <button
-                        className="w-full flex items-center space-x-3 px-4 py-2 text-left text-gray-300 hover:bg-gray-700 hover:text-white transition-colors duration-200"
-                      >
-                        <Settings className="h-4 w-4" />
-                        <span>Settings</span>
-                      </button>
-                      <button
-                        onClick={logout}
-                        className="w-full flex items-center space-x-3 px-4 py-2 text-left text-gray-300 hover:bg-gray-700 hover:text-white transition-colors duration-200"
-                      >
-                        <LogOut className="h-4 w-4" />
-                        <span>Logout</span>
-                      </button>
-                    </div>
+                <div className="absolute right-0 mt-2 w-64 bg-gray-800 border border-gray-700 rounded-lg shadow-lg z-20">
+                  <div className="px-4 py-3 border-b border-gray-700">
+                    <p className="text-sm font-semibold text-white truncate">{user?.name || 'Student'}</p>
+                    <p className="text-xs text-gray-400 truncate" title={user?.email || ''}>{user?.email || ''}</p>
                   </div>
-                </>
-              )}
-            </div>
+
+                  <div className="py-2">
+                    <button
+                      onClick={logout}
+                      className="w-full flex items-center space-x-3 px-4 py-2 text-left text-gray-300 hover:bg-gray-700 hover:text-white transition-colors duration-200"
+                    >
+                      <LogOut className="h-4 w-4" />
+                      <span>Logout</span>
+                    </button>
+                  </div>
+                </div>
+              </>
+            )}
           </div>
         </div>
       </nav>
@@ -1017,51 +1034,46 @@ const StudentProfile = () => {
         <div className="flex gap-2 mb-8">
           <button
             onClick={() => setActiveTab('overview')}
-            className={`px-6 py-3 rounded-lg font-medium transition-all text-sm ${
-              activeTab === 'overview'
-                ? 'bg-[#FFC540] text-black'
-                : 'bg-transparent text-gray-400 hover:text-white'
-            }`}
+            className={`px-6 py-3 rounded-lg font-medium transition-all text-sm ${activeTab === 'overview'
+              ? 'bg-[#FFC540] text-black'
+              : 'bg-transparent text-gray-400 hover:text-white'
+              }`}
           >
             Overview
           </button>
           <button
             onClick={() => setActiveTab('schedule')}
-            className={`px-6 py-3 rounded-lg font-medium transition-all text-sm ${
-              activeTab === 'schedule'
-                ? 'bg-[#FFC540] text-black'
-                : 'bg-transparent text-gray-400 hover:text-white'
-            }`}
+            className={`px-6 py-3 rounded-lg font-medium transition-all text-sm ${activeTab === 'schedule'
+              ? 'bg-[#FFC540] text-black'
+              : 'bg-transparent text-gray-400 hover:text-white'
+              }`}
           >
             Schedule
           </button>
           <button
             onClick={() => setActiveTab('recordings')}
-            className={`px-6 py-3 rounded-lg font-medium transition-all text-sm ${
-              activeTab === 'recordings'
-                ? 'bg-[#FFC540] text-black'
-                : 'bg-transparent text-gray-400 hover:text-white'
-            }`}
+            className={`px-6 py-3 rounded-lg font-medium transition-all text-sm ${activeTab === 'recordings'
+              ? 'bg-[#FFC540] text-black'
+              : 'bg-transparent text-gray-400 hover:text-white'
+              }`}
           >
             Recordings
           </button>
           <button
             onClick={() => setActiveTab('assignments')}
-            className={`px-6 py-3 rounded-lg font-medium transition-all text-sm ${
-              activeTab === 'assignments'
-                ? 'bg-[#FFC540] text-black'
-                : 'bg-transparent text-gray-400 hover:text-white'
-            }`}
+            className={`px-6 py-3 rounded-lg font-medium transition-all text-sm ${activeTab === 'assignments'
+              ? 'bg-[#FFC540] text-black'
+              : 'bg-transparent text-gray-400 hover:text-white'
+              }`}
           >
             Assignments
           </button>
           <button
             onClick={() => setActiveTab('contributions')}
-            className={`px-6 py-3 rounded-lg font-medium transition-all text-sm ${
-              activeTab === 'contributions'
-                ? 'bg-[#FFC540] text-black'
-                : 'bg-transparent text-gray-400 hover:text-white'
-            }`}
+            className={`px-6 py-3 rounded-lg font-medium transition-all text-sm ${activeTab === 'contributions'
+              ? 'bg-[#FFC540] text-black'
+              : 'bg-transparent text-gray-400 hover:text-white'
+              }`}
           >
             Contributions
           </button>
@@ -1204,7 +1216,11 @@ const StudentProfile = () => {
                               e.preventDefault();
                               e.stopPropagation();
                               e.nativeEvent.stopImmediatePropagation();
-                              handleJoinLiveClass(classItem, e);
+                              if (classItem.status === 'live') {
+                                handleJoinLiveClass(classItem, e);
+                              } else if (classItem.epoch && classItem.epoch > Date.now()) {
+                                handleAddToCalendar(classItem, e);
+                              }
                             }}
                             onMouseDown={(e) => {
                               if (e.button === 0) {
@@ -1212,8 +1228,8 @@ const StudentProfile = () => {
                               }
                             }}
                             className="ml-4 px-4 py-2 bg-[#FFC540] text-black rounded-lg font-semibold hover:bg-[#FFC540] transition-all flex items-center gap-2 text-sm disabled:opacity-40 disabled:cursor-not-allowed"
-                            disabled={classItem.status !== 'live' || isJoiningSession}
-                            aria-disabled={classItem.status !== 'live' || isJoiningSession}
+                            disabled={(classItem.status === 'live' && isJoiningSession) || (classItem.status !== 'live' && (!classItem.epoch || classItem.epoch <= Date.now()))}
+                            aria-disabled={(classItem.status === 'live' && isJoiningSession) || (classItem.status !== 'live' && (!classItem.epoch || classItem.epoch <= Date.now()))}
                           >
                             {classItem.status === 'live' ? (
                               <>
@@ -1274,9 +1290,9 @@ const StudentProfile = () => {
                         className="bg-[#0d1420] rounded-lg overflow-hidden border border-gray-800 hover:border-gray-700 transition-all cursor-pointer group"
                       >
                         <div className="relative">
-                          <img 
+                          <img
                             src="https://media.istockphoto.com/id/1193698730/video/mans-hands-coding-on-laptop-close-up-man-using-portable-computers-man-programmer-writes-code.jpg?s=640x640&k=20&c=QUvOTUEJBXa889HtXbzIQY0dZBXY_jEjEvbJU3seEcI="
-                            alt={recording.title} 
+                            alt={recording.title}
                             className="w-full h-32 object-cover"
                             onError={(e) => {
                               e.currentTarget.src = 'src="https://media.istockphoto.com/id/1193698730/video/mans-hands-coding-on-laptop-close-up-man-using-portable-computers-man-programmer-writes-code.jpg?s=640x640&k=20&c=QUvOTUEJBXa889HtXbzIQY0dZBXY_jEjEvbJU3seEcI=';
@@ -1299,128 +1315,6 @@ const StudentProfile = () => {
                   </div>
                 </div>
               </div>
-
-              {/* <div className="space-y-6">
-                <div className="bg-[#1a2332] rounded-xl p-6 border border-gray-800">
-                  <h2 className="text-xl font-bold text-white flex items-center gap-2 mb-6">
-                    <Users className="w-5 h-5" />
-                    Mentor Info
-                  </h2>
-                  <div className="flex flex-col items-center text-center">
-                    <img
-                      src={mentorInfo.photo}
-                      alt={mentorInfo.name}
-                      className="w-24 h-24 rounded-full object-cover mb-4 border-4 border-[#FFC540]/20"
-                    />
-                    <h3 className="text-lg font-bold text-white mb-1">{mentorInfo.name}</h3>
-                    <div className="flex items-center gap-1 text-gray-400 text-sm mb-4">
-                      <Briefcase className="w-3 h-3" />
-                      {mentorInfo.department}
-                    </div>
-                    <p className="text-gray-400 text-sm mb-4 leading-relaxed">
-                      {mentorInfo.bio}
-                    </p>
-                    <div className="w-full space-y-2 mb-4">
-                      <div className="flex items-center gap-2 text-sm text-gray-300 bg-[#0d1420] rounded-lg p-3">
-                        <Mail className="w-4 h-4 text-[#FFC540]" />
-                        <span className="text-xs break-all">{mentorInfo.email}</span>
-                      </div>
-                      <div className="flex items-center gap-2 text-sm text-gray-300 bg-[#0d1420] rounded-lg p-3">
-                        <Phone className="w-4 h-4 text-[#FFC540]" />
-                        <span className="text-xs">{mentorInfo.phone}</span>
-                      </div>
-                    </div>
-                    <button className="w-full px-4 py-3 bg-[#FFC540] text-black rounded-lg font-semibold hover:bg-[#FFC540] transition-all flex items-center justify-center gap-2">
-                      <Mail className="w-4 h-4" />
-                      Contact Mentor
-                    </button>
-                  </div>
-                </div>
-
-                <div className="bg-[#1a2332] rounded-xl p-6 border border-gray-800">
-                  <h2 className="text-xl font-bold text-white flex items-center gap-2 mb-6">
-                    <FileText className="w-5 h-5" />
-                    Assignments
-                  </h2>
-                  <div className="space-y-3">
-                    {loadingAssignments && (
-                      <div className="text-gray-400 text-sm">Loading assignments...</div>
-                    )}
-                    {!loadingAssignments && assignmentsError && (
-                      <div className="text-red-400 text-sm">{assignmentsError}</div>
-                    )}
-                    {!loadingAssignments && !assignmentsError && assignments.length === 0 && (
-                      <div className="text-gray-400 text-sm">No assignments yet.</div>
-                    )}
-                    {!loadingAssignments && !assignmentsError && assignments.slice(0, 3).map((assignment) => (
-                      <div
-                        key={assignment.studentAssignmentId || assignment.assignmentId}
-                        className="bg-[#0d1420] rounded-lg p-4 border border-gray-800 hover:border-gray-700 transition-all"
-                      >
-                        <div className="flex items-start justify-between">
-                          <div>
-                            <div className="flex items-center gap-2 mb-2">
-                              <h3 className="text-white font-medium text-sm">{assignment.title}</h3>
-                              {renderStatusBadge(assignment.status)}
-                              {assignment.gradeLabel && assignment.status === 'graded' && (
-                                <span className="px-2 py-1 bg-green-500/20 text-green-300 rounded-full text-xs font-semibold">
-                                  Grade: {assignment.gradeLabel}
-                                </span>
-                              )}
-                            </div>
-                            <div className="flex flex-col text-xs text-gray-400 gap-1">
-                              <span>Program: {assignment.program}</span>
-                              {assignment.dueDate && <span>Due: {formatDate(assignment.dueDate)}</span>}
-                            </div>
-                          </div>
-                          <button
-                            onClick={() => openAssignmentDetail(assignment)}
-                            className="ml-4 px-4 py-2 bg-[#FFC540] text-black rounded-lg font-semibold hover:bg-[#FFC540] transition-all text-xs"
-                          >
-                            {assignment.status === 'pending' ? 'Submit' : 'Details'}
-                          </button>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                <div className="bg-[#1a2332] rounded-xl p-6 border border-gray-800">
-                  <h2 className="text-xl font-bold text-white flex items-center gap-2 mb-6">
-                    <Award className="w-5 h-5" />
-                    Performance
-                  </h2>
-                  <div className="space-y-4">
-                    <div>
-                      <div className="flex justify-between text-sm mb-2">
-                        <span className="text-gray-400">Attendance Rate</span>
-                        <span className="text-white font-semibold">{studentData.attendanceRate}%</span>
-                      </div>
-                      <div className="w-full bg-gray-700 rounded-full h-2">
-                        <div
-                          className="bg-[#FFC540] h-2 rounded-full"
-                          style={{ width: `${studentData.attendanceRate}%` }}
-                        ></div>
-                      </div>
-                    </div>
-                    <div>
-                      <div className="flex justify-between text-sm mb-2">
-                        <span className="text-gray-400">Assignments Completed</span>
-                        <span className="text-white font-semibold">
-                          {studentData.completedAssignments}/{studentData.totalAssignments}
-                        </span>
-                      </div>
-                      <div className="w-full bg-gray-700 rounded-full h-2">
-                        <div
-                          className="bg-[#FFC540] h-2 rounded-full"
-                          style={{ width: `${(studentData.completedAssignments / studentData.totalAssignments) * 100}%` }}
-                        ></div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div> */}
-
             </div>
           </div>
         )}
@@ -1485,17 +1379,18 @@ const StudentProfile = () => {
                         e.nativeEvent.stopImmediatePropagation();
                         if (classItem.status === 'live' && !isJoiningSession) {
                           handleJoinLiveClass(classItem, e);
+                        } else if (classItem.status !== 'live' && classItem.epoch && classItem.epoch > Date.now()) {
+                          handleAddToCalendar(classItem, e);
                         }
                       }}
                       onMouseDown={(e) => {
-                        // Prevent any default behavior on mousedown
                         if (e.button === 0) {
                           e.preventDefault();
                         }
                       }}
                       className="ml-6 px-6 py-3 bg-[#FFC540] text-black rounded-lg font-bold hover:bg-[#FFC540] transition-all flex items-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed"
-                      disabled={classItem.status !== 'live' || isJoiningSession}
-                      aria-disabled={classItem.status !== 'live' || isJoiningSession}
+                      disabled={(classItem.status === 'live' && isJoiningSession) || (classItem.status !== 'live' && (!classItem.epoch || classItem.epoch <= Date.now()))}
+                      aria-disabled={(classItem.status === 'live' && isJoiningSession) || (classItem.status !== 'live' && (!classItem.epoch || classItem.epoch <= Date.now()))}
                     >
                       {classItem.status === 'live' ? (
                         <>
@@ -1545,7 +1440,7 @@ const StudentProfile = () => {
         {activeTab === 'recordings' && (
           <div className="bg-[#1a2332] rounded-xl p-6 border border-gray-800">
             <h2 className="text-xl font-bold text-white mb-6">Recorded Sessions</h2>
-            
+
             {loadingRecordings ? (
               <div className="flex justify-center items-center h-64">
                 <div className="text-gray-400">Loading recordings...</div>
@@ -1569,9 +1464,9 @@ const StudentProfile = () => {
                     className="bg-[#0d1420] rounded-lg overflow-hidden border border-gray-800 hover:border-gray-700 transition-all cursor-pointer group"
                   >
                     <div className="relative">
-                      <img 
-                        src={recording.thumbnailUrl} 
-                        alt={recording.title} 
+                      <img
+                        src={recording.thumbnailUrl}
+                        alt={recording.title}
                         className="w-full h-48 object-cover"
                         onError={(e) => {
                           e.currentTarget.src = 'https://media.istockphoto.com/id/1193698730/video/mans-hands-coding-on-laptop-close-up-man-using-portable-computers-man-programmer-writes-code.jpg?s=640x640&k=20&c=QUvOTUEJBXa889HtXbzIQY0dZBXY_jEjEvbJU3seEcI=';
@@ -1702,67 +1597,6 @@ const StudentProfile = () => {
 
         {activeTab === 'contributions' && (
           <div className="space-y-6">
-            {/* <div className="bg-[#1a2332] rounded-xl p-6 border border-gray-800">
-              <div className="flex items-center justify-between mb-6">
-                <h2 className="text-xl font-bold text-white flex items-center gap-2">
-                  <Upload className="w-6 h-6" />
-                  My Uploads
-                </h2>
-                <button
-                  onClick={() => setShowUploadModal(true)}
-                  className="px-6 py-2 bg-[#FFC540] text-black rounded-lg font-bold hover:bg-[#FFC540] transition-all flex items-center gap-2 text-sm"
-                >
-                  <Upload className="w-4 h-4" />
-                  Upload File
-                </button>
-              </div>
-              <div className="space-y-4">
-                {uploadedFiles.map((file) => (
-                  <div
-                    key={file.id}
-                    className="bg-[#0d1420] rounded-lg p-6 border border-gray-800 hover:border-gray-700 transition-all"
-                  >
-                    <div className="flex items-start justify-between">
-                      <div className="flex items-start gap-4 flex-1">
-                        <div className="w-12 h-12 rounded-lg bg-[#FFC540]/20 flex items-center justify-center flex-shrink-0">
-                          <File className="w-6 h-6 text-[#FFC540]" />
-                        </div>
-                        <div className="flex-1">
-                          <h3 className="text-base font-semibold text-white mb-2">{file.name}</h3>
-                          <div className="flex items-center gap-6 text-gray-400 text-sm">
-                            <span className="flex items-center gap-2">
-                              <FileText className="w-4 h-4" />
-                              {file.type}
-                            </span>
-                            <span className="flex items-center gap-2">
-                              <BookOpen className="w-4 h-4" />
-                              {file.program}
-                            </span>
-                            <span>{file.size}</span>
-                            <span className="flex items-center gap-2">
-                              <Calendar className="w-4 h-4" />
-                              {file.uploadedDate}
-                            </span>
-                          </div>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-2 ml-4">
-                        <button className="px-4 py-2 bg-[#1a2332] text-white border border-gray-700 rounded-lg font-semibold hover:bg-[#243044] transition-all text-sm">
-                          Download
-                        </button>
-                        <button
-                          onClick={() => handleDeleteFile(file.id)}
-                          className="p-2 text-red-400 hover:text-red-300 hover:bg-red-500/10 rounded-lg transition-all"
-                        >
-                          <X className="w-4 h-4" />
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div> */}
-
             <div className="bg-[#1a2332] rounded-xl p-6 border border-gray-800">
               <div className="flex items-center justify-between mb-6">
                 <h2 className="text-xl font-bold text-white flex items-center gap-2">
@@ -1784,24 +1618,22 @@ const StudentProfile = () => {
                       <div className="flex-1">
                         <div className="flex items-center gap-3 mb-2">
                           <span
-                            className={`px-3 py-1 rounded-full text-sm font-bold ${
-                              contribution.type === 'PR'
-                                ? 'bg-purple-500/20 text-purple-400'
-                                : contribution.type === 'Issue'
+                            className={`px-3 py-1 rounded-full text-sm font-bold ${contribution.type === 'PR'
+                              ? 'bg-purple-500/20 text-purple-400'
+                              : contribution.type === 'Issue'
                                 ? 'bg-green-500/20 text-green-400'
                                 : 'bg-blue-500/20 text-blue-400'
-                            }`}
+                              }`}
                           >
                             {contribution.type}
                           </span>
                           <span
-                            className={`px-3 py-1 rounded-full text-xs font-semibold ${
-                              contribution.status === 'merged'
-                                ? 'bg-green-500/20 text-green-400'
-                                : contribution.status === 'open'
+                            className={`px-3 py-1 rounded-full text-xs font-semibold ${contribution.status === 'merged'
+                              ? 'bg-green-500/20 text-green-400'
+                              : contribution.status === 'open'
                                 ? 'bg-[#FFC540]/20 text-[#FFC540]'
                                 : 'bg-red-500/20 text-red-400'
-                            }`}
+                              }`}
                           >
                             {contribution.status.toUpperCase()}
                           </span>
@@ -1966,12 +1798,12 @@ const StudentProfile = () => {
                 disabled={uploadingAssignment || !detailUploadFile || !canUploadAssignment}
                 className="px-5 py-2 rounded-lg bg-[#FFC540] text-black font-semibold hover:bg-[#e6b139] transition disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                {uploadingAssignment 
-                  ? 'Submitting...' 
-                  : !detailUploadFile 
-                    ? 'Select a file to upload' 
-                    : !canUploadAssignment 
-                      ? 'Submission Locked' 
+                {uploadingAssignment
+                  ? 'Submitting...'
+                  : !detailUploadFile
+                    ? 'Select a file to upload'
+                    : !canUploadAssignment
+                      ? 'Submission Locked'
                       : 'Submit Assignment'}
               </button>
             </div>
@@ -2119,17 +1951,17 @@ const StudentProfile = () => {
         </div>
       )}
       {/* Video Player Modal */}
-        {showVideoPlayer && selectedRecording && (
-          <VideoPlayerModal
-            isOpen={showVideoPlayer}
-            onClose={() => {
-              setShowVideoPlayer(false);
-              setSelectedRecording(null);
-            }}
-            videoUrl={`https://prod-video-transcoding.polariscampus.com/v1/vod/sessions/${selectedRecording.sessionId}/master-playlist`}
-            title={selectedRecording.title}
-          />
-        )}
+      {showVideoPlayer && selectedRecording && (
+        <VideoPlayerModal
+          isOpen={showVideoPlayer}
+          onClose={() => {
+            setShowVideoPlayer(false);
+            setSelectedRecording(null);
+          }}
+          videoUrl={`https://prod-video-transcoding.polariscampus.com/v1/vod/sessions/${selectedRecording.sessionId}/master-playlist`}
+          title={selectedRecording.title}
+        />
+      )}
     </div>
   );
 };

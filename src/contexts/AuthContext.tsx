@@ -1,5 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { createContext, useContext, useState, useEffect, type ReactNode } from 'react';
 
 interface User {
   id: string;
@@ -67,6 +66,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         email: String(email || ''),
         name: String(name || ''),
         userType: normalizedType as User['userType'],
+        batchId: payload?.batchId || payload?.batch_id ? Number(payload?.batchId || payload?.batch_id) : undefined,
       };
     } catch (error) {
       console.error('Failed to decode user from token:', error);

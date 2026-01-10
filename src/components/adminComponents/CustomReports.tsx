@@ -1,5 +1,7 @@
-import React, { useState } from 'react';
-import { Download, Filter, Calendar, FileText, BarChart3, Users, BookOpen } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Download, Filter, Calendar, FileText, BarChart3, Users, BookOpen, Video, Eye, Clock, CheckCircle, XCircle, PlayCircle, Loader2 } from 'lucide-react';
+import { useApi } from '../../services/api';
+import Modal from './Modal';
 
 interface ReportFilter {
   program: string;
@@ -19,6 +21,19 @@ const CustomReports: React.FC = () => {
   });
 
   const [isGenerating, setIsGenerating] = useState(false);
+  const [sessionsList, setSessionsList] = useState<any[]>([]);
+  const [loadingSessions, setLoadingSessions] = useState(false);
+  const [selectedSessionId, setSelectedSessionId] = useState<number | null>(null);
+  const [sessionAnalytics, setSessionAnalytics] = useState<any>(null);
+  const [loadingAnalytics, setLoadingAnalytics] = useState(false);
+  const [showSessionModal, setShowSessionModal] = useState(false);
+  const api = useApi();
+
+  useEffect(() => {
+    if (filters.reportType === 'sessions') {
+      fetchSessions();
+    }
+  }, [filters.reportType]);
 
   const programs = ['All Programs', 'Full Stack Development', 'Data Science Bootcamp', 'UI/UX Design', 'Machine Learning'];
   const mentors = ['All Mentors', 'Dr. Sarah Wilson', 'Prof. Michael Chen', 'Ms. Emily Rodriguez', 'Dr. James Thompson'];
@@ -33,6 +48,78 @@ const CustomReports: React.FC = () => {
 
   const handleFilterChange = (key: keyof ReportFilter, value: string) => {
     setFilters(prev => ({ ...prev, [key]: value }));
+  };
+
+  const fetchSessions = async () => {
+    try {
+      setLoadingSessions(true);
+      // Use new endpoint to get ended sessions from LiveClassSession (MongoDB)
+      // This ensures sessionId matches with getSessionAnalytics endpoint
+      const response = await api.multimedia.sessions.getEndedSessions();
+      
+      if (response && response.success) {
+        const endedSessions = (response.data || [])
+          .sort((a: any, b: any) => {
+            const dateA = new Date(a.endTime || a.createdAt || 0);
+            const dateB = new Date(b.endTime || b.createdAt || 0);
+            return dateB.getTime() - dateA.getTime();
+          });
+        
+        setSessionsList(endedSessions);
+      } else {
+        setSessionsList([]);
+      }
+    } catch (err: any) {
+      console.error('Error fetching sessions:', err);
+      setSessionsList([]);
+    } finally {
+      setLoadingSessions(false);
+    }
+  };
+
+  const fetchSessionAnalytics = async (sessionId: number) => {
+    try {
+      setLoadingAnalytics(true);
+      const response = await api.multimedia.attendance.getSessionAnalytics(sessionId);
+      
+      if (response && response.data) {
+        const data = response.data;
+        setSessionAnalytics({
+          ...data,
+          startTime: new Date(data.startTime),
+          endTime: new Date(data.endTime),
+          students: data.students?.map((s: any) => ({
+            ...s,
+            joinedAt: new Date(s.joinedAt),
+            leftAt: s.leftAt ? new Date(s.leftAt) : undefined
+          })) || []
+        });
+        setShowSessionModal(true);
+      }
+    } catch (err: any) {
+      console.error('Error fetching analytics:', err);
+    } finally {
+      setLoadingAnalytics(false);
+    }
+  };
+
+  const formatDuration = (seconds: number): string => {
+    const hours = Math.floor(seconds / 3600);
+    const minutes = Math.floor((seconds % 3600) / 60);
+    if (hours > 0) {
+      return `${hours}h ${minutes}m`;
+    }
+    return `${minutes}m`;
+  };
+
+  const formatDate = (date: Date): string => {
+    return new Date(date).toLocaleString('en-US', {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
   };
 
   const generateReport = async (format: 'csv' | 'pdf') => {
@@ -118,6 +205,76 @@ const CustomReports: React.FC = () => {
 
   const getReportPreview = () => {
     const selectedType = reportTypes.find(type => type.value === filters.reportType);
+    
+    // Show session analytics if sessions report type is selected
+    if (filters.reportType === 'sessions') {
+      if (loadingSessions) {
+        return (
+          <div className="bg-gray-800 rounded-lg p-6 border border-gray-700 flex items-center justify-center py-12">
+            <Loader2 className="w-8 h-8 animate-spin text-yellow-500" />
+          </div>
+        );
+      }
+
+      if (sessionsList.length === 0) {
+        return (
+          <div className="bg-gray-800 rounded-lg p-6 border border-gray-700 text-center py-12">
+            <Video className="w-16 h-16 text-gray-600 mx-auto mb-4" />
+            <p className="text-gray-400 text-lg">No completed sessions found</p>
+            <p className="text-gray-500 text-sm mt-2">Sessions will appear here once they are completed</p>
+          </div>
+        );
+      }
+
+      return (
+        <div className="bg-gray-800 rounded-lg p-6 border border-gray-700">
+          <div className="flex items-center space-x-3 mb-4">
+            <Calendar className="w-5 h-5 text-yellow-500" />
+            <h4 className="text-lg font-semibold text-white">Session Analytics</h4>
+          </div>
+
+          <div className="space-y-3">
+            {sessionsList.slice(0, 10).map((session) => (
+              <div
+                key={session.sessionId || session.id}
+                onClick={() => fetchSessionAnalytics(session.sessionId || session.id)}
+                className="bg-gray-700 rounded-lg p-4 cursor-pointer hover:bg-gray-600 transition-colors duration-200 border border-gray-600"
+              >
+                <div className="flex items-start justify-between">
+                  <div className="flex-1">
+                    <h4 className="text-white font-medium mb-2">
+                      {session.title || session.entityName || `Session ${session.sessionId || session.id}`}
+                    </h4>
+                    <div className="space-y-1 text-sm text-gray-400">
+                      <div className="flex items-center space-x-2">
+                        <Calendar className="w-4 h-4" />
+                        <span>
+                          {new Date(session.endTime || session.createdAt).toLocaleDateString()}
+                        </span>
+                      </div>
+                      {session.duration && (
+                        <div className="flex items-center space-x-2">
+                          <Clock className="w-4 h-4" />
+                          <span>{formatDuration(session.duration)}</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                  <Eye className="w-5 h-5 text-gray-400" />
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {sessionsList.length > 10 && (
+            <div className="mt-4 text-center text-gray-400 text-sm">
+              ... and {sessionsList.length - 10} more sessions
+            </div>
+          )}
+        </div>
+      );
+    }
+
     const mockData = generateMockData();
 
     return (
@@ -294,6 +451,171 @@ const CustomReports: React.FC = () => {
           {getReportPreview()}
         </div>
       </div>
+
+      {/* Session Analytics Modal */}
+      <Modal
+        isOpen={showSessionModal}
+        onClose={() => {
+          setShowSessionModal(false);
+          setSessionAnalytics(null);
+        }}
+        title="Session Analytics"
+        size="xl"
+      >
+        {loadingAnalytics ? (
+          <div className="flex items-center justify-center py-12">
+            <Loader2 className="w-8 h-8 animate-spin text-yellow-500" />
+          </div>
+        ) : sessionAnalytics ? (
+          <div className="space-y-6">
+            {/* Overview Cards */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+              <div className="bg-gray-800 rounded-lg p-4 border border-gray-700">
+                <div className="flex items-center justify-between mb-2">
+                  <p className="text-gray-400 text-sm">Total Students</p>
+                  <Users className="w-5 h-5 text-blue-400" />
+                </div>
+                <p className="text-2xl font-bold text-white">{sessionAnalytics.totalStudents}</p>
+              </div>
+
+              <div className="bg-gray-800 rounded-lg p-4 border border-gray-700">
+                <div className="flex items-center justify-between mb-2">
+                  <p className="text-gray-400 text-sm">Present (≥50%)</p>
+                  <CheckCircle className="w-5 h-5 text-green-400" />
+                </div>
+                <p className="text-2xl font-bold text-green-400">{sessionAnalytics.studentsPresent}</p>
+                <p className="text-xs text-gray-400 mt-1">
+                  {sessionAnalytics.attendancePercentage.toFixed(1)}% attendance rate
+                </p>
+              </div>
+
+              <div className="bg-gray-800 rounded-lg p-4 border border-gray-700">
+                <div className="flex items-center justify-between mb-2">
+                  <p className="text-gray-400 text-sm">Absent</p>
+                  <XCircle className="w-5 h-5 text-red-400" />
+                </div>
+                <p className="text-2xl font-bold text-red-400">{sessionAnalytics.studentsAbsent}</p>
+              </div>
+
+              <div className="bg-gray-800 rounded-lg p-4 border border-gray-700">
+                <div className="flex items-center justify-between mb-2">
+                  <p className="text-gray-400 text-sm">Avg Engagement</p>
+                  <Clock className="w-5 h-5 text-yellow-400" />
+                </div>
+                <p className="text-2xl font-bold text-yellow-400">
+                  {formatDuration(sessionAnalytics.averageEngagementTime)}
+                </p>
+              </div>
+            </div>
+
+            {/* Session Details */}
+            <div className="bg-gray-800 rounded-lg p-6 border border-gray-700">
+              <h3 className="text-lg font-semibold text-white mb-4 flex items-center space-x-2">
+                <PlayCircle className="w-5 h-5 text-yellow-500" />
+                <span>Session Details</span>
+              </h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <p className="text-gray-400 text-sm mb-1">Session Title</p>
+                  <p className="text-white font-medium">{sessionAnalytics.sessionTitle}</p>
+                </div>
+                <div>
+                  <p className="text-gray-400 text-sm mb-1">Faculty</p>
+                  <p className="text-white font-medium">{sessionAnalytics.facultyName}</p>
+                </div>
+                <div>
+                  <p className="text-gray-400 text-sm mb-1">Start Time</p>
+                  <p className="text-white">{formatDate(sessionAnalytics.startTime)}</p>
+                </div>
+                <div>
+                  <p className="text-gray-400 text-sm mb-1">Duration</p>
+                  <p className="text-white">{formatDuration(sessionAnalytics.duration)}</p>
+                </div>
+              </div>
+            </div>
+
+            {/* Students Table */}
+            <div className="bg-gray-800 rounded-lg border border-gray-700 overflow-hidden">
+              <div className="p-6 border-b border-gray-700">
+                <h3 className="text-lg font-semibold text-white flex items-center space-x-2">
+                  <Users className="w-5 h-5 text-yellow-500" />
+                  <span>Student Attendance ({sessionAnalytics.totalStudents})</span>
+                </h3>
+              </div>
+
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead className="bg-gray-900/50 border-b border-gray-700">
+                    <tr>
+                      <th className="px-6 py-3 text-left text-sm font-semibold text-gray-300">Student</th>
+                      <th className="px-6 py-3 text-left text-sm font-semibold text-gray-300">Status</th>
+                      <th className="px-6 py-3 text-left text-sm font-semibold text-gray-300">Attendance %</th>
+                      <th className="px-6 py-3 text-left text-sm font-semibold text-gray-300">Time Spent</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-700">
+                    {sessionAnalytics.students.slice(0, 10).map((student: any) => (
+                      <tr key={student.studentId} className="hover:bg-gray-700/50 transition-colors">
+                        <td className="px-6 py-4">
+                          <div className="flex items-center space-x-3">
+                            {student.imageUrl ? (
+                              <img
+                                src={student.imageUrl}
+                                alt={student.studentName}
+                                className="w-10 h-10 rounded-full"
+                              />
+                            ) : (
+                              <div className="w-10 h-10 rounded-full bg-yellow-500 flex items-center justify-center text-black font-bold">
+                                {student.studentName.charAt(0).toUpperCase()}
+                              </div>
+                            )}
+                            <div>
+                              <p className="text-white font-medium">{student.studentName}</p>
+                            </div>
+                          </div>
+                        </td>
+                        <td className="px-6 py-4">
+                          <span
+                            className={`px-3 py-1 text-xs font-medium rounded-full ${
+                              student.isPresent
+                                ? 'bg-green-500/20 text-green-400'
+                                : 'bg-red-500/20 text-red-400'
+                            }`}
+                          >
+                            {student.isPresent ? 'Present' : 'Absent'}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4">
+                          <div className="flex items-center space-x-2">
+                            <div className="w-20 bg-gray-700 rounded-full h-2">
+                              <div
+                                className={`h-2 rounded-full ${
+                                  student.attendancePercentage >= 50
+                                    ? 'bg-green-400'
+                                    : student.attendancePercentage >= 25
+                                    ? 'bg-yellow-400'
+                                    : 'bg-red-400'
+                                }`}
+                                style={{ width: `${Math.min(student.attendancePercentage, 100)}%` }}
+                              ></div>
+                            </div>
+                            <span className="text-gray-300 text-sm">
+                              {student.attendancePercentage.toFixed(1)}%
+                            </span>
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 text-gray-300">
+                          {formatDuration(student.totalDuration)}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        ) : null}
+      </Modal>
     </div>
   );
 };

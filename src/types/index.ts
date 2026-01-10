@@ -18,6 +18,17 @@ export interface Program {
   } | null;
 }
 
+export interface Batch {
+  id: string;
+  name: string;
+  studentsCount?: number;
+  sessionsCount?: number;
+  academicYear?: string;
+  semester?: number;
+  type?: string | null;
+  createdAt?: string;
+}
+
 
 export interface Group {
   id: string;
@@ -68,4 +79,20 @@ export interface NotificationItem {
   message: string;
   timestamp: string;
   read: boolean;
+}
+
+export interface Lecture {
+  lecture_id: number;
+  lecture_name: string;
+  lecture_date: string;
+  duration: number;
+  students_present: number;
+}
+
+export interface MentorAnalytics {
+  mentor_id: string;
+  mentor_name: string;
+  mentor_email: string;
+  lecture_count: number;
+  lectures?: Lecture[];
 }

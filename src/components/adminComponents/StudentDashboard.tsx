@@ -113,6 +113,16 @@ const StudentDashboard: React.FC = () => {
   // Fetch when page or filters change
   useEffect(() => {
     fetchStudentData();
+    
+    // Auto-refresh attendance data every 30 seconds to get updated data from Supabase
+    // This ensures attendance marked by webhook (50% threshold) and synced to Supabase is reflected in UI
+    const refreshInterval = setInterval(() => {
+      fetchStudentData();
+    }, 30000); // 30 seconds
+    
+    return () => {
+      clearInterval(refreshInterval);
+    };
   }, [currentPage, selectedProgram, selectedBatch]);
   
   const getAttendanceColor = (rate: number): string => {

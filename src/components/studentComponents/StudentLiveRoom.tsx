@@ -1,18 +1,20 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState, useCallback, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
   useHMSActions,
   useHMSStore,
+  useHMSNotifications,
   selectPeers,
   selectIsLocalAudioEnabled,
   selectIsLocalVideoEnabled,
+  selectIsConnectedToRoom,
 } from '@100mslive/react-sdk';
 import {
   GraduationCap,
   Mic,
   MicOff,
-  Pin,
   ScreenShare,
+  ScreenShareOff,
   Users,
   Video,
   VideoOff,
@@ -26,6 +28,7 @@ interface StoredSessionData {
   batchName?: string;
   hms?: {
     authToken?: string;
+    token?: string;
   };
   [key: string]: any;
 }
@@ -38,6 +41,8 @@ const StudentLiveRoom: React.FC = () => {
   const peers = useHMSStore(selectPeers);
   const isLocalAudioEnabled = useHMSStore(selectIsLocalAudioEnabled);
   const isLocalVideoEnabled = useHMSStore(selectIsLocalVideoEnabled);
+  const isConnected = useHMSStore(selectIsConnectedToRoom);
+  const notification = useHMSNotifications();
 
   const [isJoining, setIsJoining] = useState(true);
   const [isLeaving, setIsLeaving] = useState(false);
@@ -46,13 +51,15 @@ const StudentLiveRoom: React.FC = () => {
   const [hasAttemptedJoin, setHasAttemptedJoin] = useState(false);
   const [pinnedPeerId, setPinnedPeerId] = useState<string | null>(null);
   const [showParticipants, setShowParticipants] = useState(false);
+  const [isScreenSharing, setIsScreenSharing] = useState(false);
+  const hadTutorBeforeRef = useRef(false);
 
   const sessionToken = useMemo(() => {
     return localStorage.getItem('live_class_token');
   }, []);
 
   const visiblePeers = useMemo(
-    () => peers.filter((peer) => !peer.isAuxiliary),
+    () => peers.filter(peer => !(peer as any).isAuxiliary && !/beam/i.test(peer.name)),
     [peers]
   );
 
@@ -114,6 +121,104 @@ const StudentLiveRoom: React.FC = () => {
     }
   }, [sessionData, sessionToken, hasAttemptedJoin]);
 
+  const handleAutoLeave = useCallback(async (message: string) => {
+    if (isLeaving) return;
+    setIsLeaving(true);
+    setError(message);
+    try {
+      await hmsActions.leave();
+    } catch (err) {
+      console.error('Failed to leave room:', err);
+    } finally {
+      setTimeout(() => {
+        navigate('/student/dashboard');
+      }, 2000);
+    }
+  }, [isLeaving, hmsActions, navigate]);
+
+  useEffect(() => {
+    if (!notification) return;
+
+    const notificationType = notification.type;
+
+    // Log for debugging
+    console.log('HMS Notification:', notificationType, notification);
+
+    if (
+      notificationType === 'ROOM_ENDED' ||
+      notificationType === 'REMOVED_FROM_ROOM' ||
+      (notificationType as string) === 'ROOM_ENDED_BY_HOST' // Cast to string to avoid type error
+    ) {
+      console.log('Room ended or user removed:', notification);
+      const message = (notification as any).data?.reason || 'The session has ended by the mentor.';
+      handleAutoLeave(message);
+    }
+  }, [notification, handleAutoLeave]);
+
+  const prevConnectedRef = useRef<boolean | null>(null);
+
+  useEffect(() => {
+    // Case 1: Connection lost after being connected
+    if (prevConnectedRef.current === true && !isConnected && hasAttemptedJoin && !isJoining && !isLeaving) {
+      console.log('Room connection lost - session ended by mentor');
+      handleAutoLeave('The session has ended by the mentor.');
+    }
+
+    if (hasAttemptedJoin && !isJoining) {
+      prevConnectedRef.current = isConnected || false; // Handle undefined
+    }
+  }, [isConnected, hasAttemptedJoin, isJoining, isLeaving, handleAutoLeave]);
+
+  // Monitor peers to detect when mentor leaves
+  useEffect(() => {
+    // If we are not connected yet or leaving, skip
+    if (!hasAttemptedJoin || isJoining || isLeaving) return;
+
+    // Case 2: All peers disappeared (room likely ended)
+    if (visiblePeers.length === 0 && !isConnected) {
+      const timeoutId = setTimeout(() => {
+        if (visiblePeers.length === 0 && !isConnected && hasAttemptedJoin) {
+          console.log('All peers disappeared - room ended');
+          handleAutoLeave('The session has ended by the mentor.');
+        }
+      }, 2000);
+      return () => clearTimeout(timeoutId);
+    }
+
+    const currentHasTutor = remotePeers.some((peer) => peer.roleName?.toLowerCase() === 'tutor');
+
+    if (currentHasTutor) {
+      hadTutorBeforeRef.current = true;
+    }
+
+    // Case 3: Tutor was present but is now gone (and we might be disconnected)
+    if (hadTutorBeforeRef.current && !currentHasTutor && !isConnected) {
+      const timeoutId = setTimeout(() => {
+        if (!isConnected && hasAttemptedJoin) {
+          console.log('Tutor left and connection lost - session ended');
+          handleAutoLeave('The session has ended by the mentor.');
+          hadTutorBeforeRef.current = false;
+        }
+      }, 1500);
+      return () => clearTimeout(timeoutId);
+    }
+
+    // Case 4: We are still connected, but Tutor left (and we are the only ones or just students left)
+    // Only trigger this if we are sure the tutor was there before
+    if (isConnected && hadTutorBeforeRef.current && !currentHasTutor) {
+      const timeoutId = setTimeout(() => {
+        // Double check after delay
+        const stillNoTutor = !remotePeers.some((peer) => peer.roleName?.toLowerCase() === 'tutor');
+        if (stillNoTutor) {
+          console.log('Tutor has left the room - ending session for student');
+          handleAutoLeave('The mentor has ended the session.');
+        }
+      }, 5000); // Give a bit more grace period (5s) for refresh/reconnect
+      return () => clearTimeout(timeoutId);
+    }
+
+  }, [visiblePeers.length, remotePeers, isConnected, hasAttemptedJoin, isJoining, isLeaving, handleAutoLeave]);
+
   useEffect(() => {
     return () => {
       hmsActions.leave().catch((err) => {
@@ -139,6 +244,21 @@ const StudentLiveRoom: React.FC = () => {
       setError(err?.message || 'Failed to join live class. Please try again.');
       setIsJoining(false);
       setHasAttemptedJoin(false);
+    }
+  };
+
+  const toggleScreenShare = async () => {
+    try {
+      if (isScreenSharing) {
+        await hmsActions.setScreenShareEnabled(false);
+        setIsScreenSharing(false);
+      } else {
+        await hmsActions.setScreenShareEnabled(true);
+        setIsScreenSharing(true);
+      }
+    } catch (err: any) {
+      console.error('Error toggling screen share:', err);
+      // You might want to show a toast or error message here
     }
   };
 
@@ -196,25 +316,19 @@ const StudentLiveRoom: React.FC = () => {
         </div>
       </div>
 
-      <div className="video-container">
-        {remotePeers.length === 0 && !visiblePeers.some((peer) => peer.auxiliaryTracks?.length) ? (
-          <div className="no-peers">
-            <p>Waiting for class to begin...</p>
-            <p className="small">
-              If this persists, please verify the mentor has started the session.
-            </p>
-          </div>
-        ) : (
-          <>
-            {visiblePeers
-              .filter((peer) => peer.auxiliaryTracks && peer.auxiliaryTracks.length > 0)
-              .map((peer) => (
+      <div className={`video-container ${peers.some(p => p.auxiliaryTracks?.length > 0) ? 'screen-share-active' : ''}`}>
+        {/* Screen Share View */}
+        {peers.some(peer => peer.auxiliaryTracks?.length > 0) && (
+          <div className="screen-share-container">
+            {peers
+              .filter(peer => peer.auxiliaryTracks && peer.auxiliaryTracks.length > 0)
+              .map(peer => (
                 <div key={`${peer.id}-screen`} className="screen-share-main">
                   <video
                     autoPlay
                     playsInline
                     muted
-                    ref={(node) => {
+                    ref={node => {
                       if (!node) return;
                       const screenTrack = peer.auxiliaryTracks?.[0];
                       if (screenTrack) {
@@ -223,83 +337,62 @@ const StudentLiveRoom: React.FC = () => {
                         } catch (err) {
                           console.error('Failed to attach screen share track:', err);
                         }
-                      } else {
-                        node.srcObject = null;
                       }
                     }}
+                    className="screen-share-video"
                   />
-                  <div className="screen-share-label icon-text">
-                    <ScreenShare size={18} />
-                    <span>{peer.name} is sharing their screen</span>
+                  <div className="screen-share-label">
+                    <ScreenShare size={20} />
+                    <span>{peer.name}'s Screen</span>
                   </div>
                 </div>
               ))}
+          </div>
+        )}
 
-            <div className="video-grid">
-              {visiblePeers.map((peer) => {
-                const isLocal = peer.isLocal;
-                const isPinned = pinnedPeerId === peer.id;
+        {/* Regular Video Grid */}
+        <div className={`video-grid ${peers.some(p => p.auxiliaryTracks?.length > 0) ? 'compact' : ''}`}>
+          {visiblePeers.map((peer) => {
+            const isLocal = peer.isLocal;
+            const isPinned = pinnedPeerId === peer.id;
 
-                const attachTrack = (node: HTMLVideoElement | null, trackId: string | undefined) => {
-                  if (!node) return;
-                  if (trackId) {
-                    try {
-                      hmsActions.attachVideo(trackId, node);
-                    } catch (err) {
-                      console.error('Failed to attach track:', err);
+            return (
+              <div
+                key={peer.id}
+                className={`video-tile ${isPinned ? 'pinned' : ''}`}
+                onClick={() => setPinnedPeerId(isPinned ? null : peer.id)}
+              >
+                <video
+                  autoPlay
+                  playsInline
+                  muted={isLocal}
+                  ref={(node) => {
+                    if (node && peer.videoTrack) {
+                      hmsActions.attachVideo(peer.videoTrack, node);
                     }
-                  } else {
-                    node.srcObject = null;
-                  }
-                };
+                  }}
+                  className="peer-video"
+                />
 
-                return (
-                  <div
-                    key={peer.id}
-                    className={`video-tile ${isPinned ? 'pinned' : ''}`}
-                    onClick={() => setPinnedPeerId(isPinned ? null : peer.id)}
-                    title={isPinned ? 'Unpin' : 'Pin to focus'}
-                  >
-                    <video
-                      autoPlay
-                      playsInline
-                      muted={isLocal}
-                      ref={(node) => attachTrack(node, peer.videoTrack)}
-                      className="peer-video"
-                    />
-
-                    {/* Fallback when mentor camera is off */}
-                    {!peer.videoTrack && (
-                      <div className="no-video-fallback">
-                        <span>{peer.name?.charAt(0)?.toUpperCase() || 'P'}</span>
-                      </div>
-                    )}
-
-                    <div className="peer-info">
-                      <span className="peer-name">
-                        {peer.name}
-                        {peer.roleName === 'tutor' && (
-                          <GraduationCap size={16} className="icon-inline" />
-                        )}
-                        {peer.roleName === 'student' && peer.isLocal && ' (You)'}
-                        {isPinned && <Pin size={16} className="icon-inline" />}
-                      </span>
-                      <div className="track-debug">
-                        <span className="icon-label">
-                          {peer.audioTrack ? <Mic size={14} /> : <MicOff size={14} />}
-                          <span>{peer.audioTrack ? 'On' : 'Muted'}</span>
-                        </span>
-                        <span className="icon-label">
-                          {peer.videoTrack ? <Video size={14} /> : <VideoOff size={14} />}
-                          <span>{peer.videoTrack ? 'On' : 'Off'}</span>
-                        </span>
-                      </div>
-                    </div>
+                <div className="peer-info">
+                  <span className="peer-name">
+                    {peer.name}
+                    {peer.isLocal && ' (You)'}
+                  </span>
+                  <div className="track-status">
+                    {!peer.audioTrack && <MicOff size={14} />}
+                    {!peer.videoTrack && <VideoOff size={14} />}
                   </div>
-                );
-              })}
-            </div>
-          </>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
+        {visiblePeers.length === 0 && !peers.some(p => p.auxiliaryTracks?.length > 0) && (
+          <div className="no-peers">
+            <p>Waiting for class to begin...</p>
+          </div>
         )}
       </div>
 
@@ -319,6 +412,20 @@ const StudentLiveRoom: React.FC = () => {
           {isLocalVideoEnabled ? <Video size={24} /> : <VideoOff size={24} />}
         </button>
         <button
+          className={`control-btn ${isScreenSharing ? 'active' : ''} ${peers.some(p => p.auxiliaryTracks?.length > 0 && !p.isLocal) ? 'disabled' : ''}`}
+          onClick={toggleScreenShare}
+          disabled={peers.some(p => p.auxiliaryTracks?.length > 0 && !p.isLocal)}
+          title={
+            peers.some(p => p.auxiliaryTracks?.length > 0 && !p.isLocal)
+              ? 'Someone is already sharing their screen'
+              : isScreenSharing
+                ? 'Stop sharing screen'
+                : 'Share screen'
+          }
+        >
+          {isScreenSharing ? <ScreenShare size={24} /> : <ScreenShareOff size={24} />}
+        </button>
+        <button
           className={`control-btn participants-btn ${showParticipants ? 'active' : ''}`}
           onClick={() => setShowParticipants((prev) => !prev)}
           title="Toggle participants list"
@@ -334,11 +441,7 @@ const StudentLiveRoom: React.FC = () => {
         </button>
       </div>
 
-      <div className="room-footer">
-        <p className="recording-notice">
-          🔒 Session attendance is being recorded. Please stay connected until the class ends.
-        </p>
-      </div>
+
 
       {showParticipants && (
         <>
@@ -362,12 +465,12 @@ const StudentLiveRoom: React.FC = () => {
                   </span>
                   <span className="participant-status">
                     <span className="icon-label">
-                      {peer.audioTrack ? <Mic size={14} /> : <MicOff size={14} />}
-                      <span>{peer.audioTrack ? 'On' : 'Muted'}</span>
+                      {peer.audioTrack && ((peer.audioTrack as any).enabled === undefined || (peer.audioTrack as any).enabled !== false) ? <Mic size={14} /> : <MicOff size={14} />}
+                      <span>{peer.audioTrack && ((peer.audioTrack as any).enabled === undefined || (peer.audioTrack as any).enabled !== false) ? 'On' : 'Muted'}</span>
                     </span>
                     <span className="icon-label">
-                      {peer.videoTrack ? <Video size={14} /> : <VideoOff size={14} />}
-                      <span>{peer.videoTrack ? 'On' : 'Off'}</span>
+                      {peer.videoTrack && ((peer.videoTrack as any).enabled === undefined || (peer.videoTrack as any).enabled !== false) ? <Video size={14} /> : <VideoOff size={14} />}
+                      <span>{peer.videoTrack && ((peer.videoTrack as any).enabled === undefined || (peer.videoTrack as any).enabled !== false) ? 'On' : 'Off'}</span>
                     </span>
                   </span>
                 </li>

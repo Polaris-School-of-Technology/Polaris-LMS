@@ -76,7 +76,7 @@ const MentorTopNavbar: React.FC<MentorTopNavbarProps> = ({ activeSection: _activ
   const handleBatchChange = (batchId: string) => {
     setSelectedBatchId(batchId);
     setSections([]);
-    setSessionData({...sessionData, section_id: ''});
+    setSessionData({ ...sessionData, section_id: '' });
   };
 
   const openScheduleModal = () => {
@@ -105,7 +105,7 @@ const MentorTopNavbar: React.FC<MentorTopNavbarProps> = ({ activeSection: _activ
   const handleScheduleSession = async () => {
     try {
       setLoading(true);
-      
+
       const sessionPayload = {
         section_id: parseInt(sessionData.section_id),
         faculty_id: user?.id,
@@ -133,54 +133,59 @@ const MentorTopNavbar: React.FC<MentorTopNavbarProps> = ({ activeSection: _activ
 
   return (
     <header className="bg-gray-800 border-b border-gray-700">
-      <div className="px-6 py-4">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center space-x-8">
-            <div>
-              <h1 className="text-xl font-bold text-[#FFC540]">Polaris Labs</h1>
-              <p className="text-gray-400 text-sm">Mentor Portal</p>
+      <div className="px-3 sm:px-4 md:px-6 py-2 sm:py-3 md:py-4">
+        <div className="flex items-center justify-between gap-2 sm:gap-4">
+          <div className="flex items-center space-x-2 sm:space-x-4 md:space-x-8 flex-shrink-0 min-w-0">
+            <div className="min-w-0">
+              <h1 className="text-base sm:text-lg md:text-xl font-bold text-[#FFC540] truncate">Polaris Labs</h1>
+              <p className="text-gray-400 text-xs sm:text-sm hidden sm:block">Mentor Portal</p>
             </div>
           </div>
-          
-          <div className="flex items-center space-x-6">
-            <div className="relative">
+
+          <div className="flex items-center space-x-1 sm:space-x-2 md:space-x-4 lg:space-x-6 flex-shrink-0">
+            {/* Search - Hidden on mobile, visible on tablet+ */}
+            <div className="hidden md:block relative">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
               <input
                 type="text"
-                placeholder="Search students, sessions, recordings..."
-                className="pl-10 pr-4 py-2 bg-gray-700 border border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#FFC540] focus:border-transparent text-white placeholder-gray-400 w-64"
+                placeholder="Search students, sessions..."
+                className="pl-10 pr-4 py-2 bg-gray-700 border border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#FFC540] focus:border-transparent text-white placeholder-gray-400 w-48 lg:w-64 text-sm"
               />
             </div>
-            
-            <button 
+
+            {/* Schedule Session Button - Hidden text on mobile */}
+            <button
               onClick={openScheduleModal}
-              className="flex items-center space-x-2 bg-[#FFC540] text-black px-4 py-2 rounded-lg hover:bg-[#e6b139] transition-colors duration-200"
+              className="flex items-center space-x-1 sm:space-x-2 bg-[#FFC540] text-black px-2 sm:px-3 md:px-4 py-1.5 sm:py-2 rounded-lg hover:bg-[#e6b139] transition-colors duration-200 text-xs sm:text-sm font-medium"
             >
-              <Calendar className="h-4 w-4" />
-              <span>Schedule Session</span>
+              <Calendar className="h-3 w-3 sm:h-4 sm:w-4" />
+              <span className="hidden sm:inline">Schedule Session</span>
+              <span className="sm:hidden">Schedule</span>
             </button>
-            
-            <button className="relative p-2 text-gray-400 hover:text-white transition-colors duration-200">
-              <Bell className="h-5 w-5" />
-              <span className="absolute -top-1 -right-1 h-4 w-4 bg-red-500 text-white text-xs rounded-full flex items-center justify-center">
+
+            {/* Notifications */}
+            <button className="relative p-1.5 sm:p-2 text-gray-400 hover:text-white transition-colors duration-200">
+              <Bell className="h-4 w-4 sm:h-5 sm:w-5" />
+              <span className="absolute -top-0.5 -right-0.5 sm:-top-1 sm:-right-1 h-3 w-3 sm:h-4 sm:w-4 bg-red-500 text-white text-[10px] sm:text-xs rounded-full flex items-center justify-center font-medium">
                 2
               </span>
             </button>
-            
-            <button className="p-2 text-gray-400 hover:text-white transition-colors duration-200">
-              <Settings className="h-5 w-5" />
+
+            {/* Settings - Hidden on mobile */}
+            <button className="hidden sm:block p-1.5 sm:p-2 text-gray-400 hover:text-white transition-colors duration-200">
+              <Settings className="h-4 w-4 sm:h-5 sm:w-5" />
             </button>
-            
+
             {/* User Profile Dropdown */}
             <div className="relative">
               <button
                 onClick={() => setShowDropdown(!showDropdown)}
-                className="flex items-center space-x-2 hover:bg-gray-700 rounded-lg px-2 py-1 transition-colors duration-200"
+                className="flex items-center space-x-1 sm:space-x-2 hover:bg-gray-700 rounded-lg px-1.5 sm:px-2 py-1 transition-colors duration-200"
               >
-                <div className="w-8 h-8 bg-[#FFC540] rounded-full flex items-center justify-center">
-                  <User className="h-4 w-4 text-black" />
+                <div className="w-7 h-7 sm:w-8 sm:h-8 bg-[#FFC540] rounded-full flex items-center justify-center">
+                  <User className="h-3 w-3 sm:h-4 sm:w-4 text-black" />
                 </div>
-                <ChevronDown className="h-4 w-4 text-gray-400" />
+                <ChevronDown className="h-3 w-3 sm:h-4 sm:w-4 text-gray-400 hidden sm:block" />
               </button>
 
               {/* Dropdown Menu */}
@@ -191,19 +196,19 @@ const MentorTopNavbar: React.FC<MentorTopNavbarProps> = ({ activeSection: _activ
                     className="fixed inset-0 z-10"
                     onClick={() => setShowDropdown(false)}
                   />
-                  
-                  <div className="absolute right-0 mt-2 w-64 bg-gray-800 border border-gray-700 rounded-lg shadow-lg z-20">
-                    <div className="px-4 py-3 border-b border-gray-700">
-                      <p className="text-sm font-semibold text-white">{user?.name || 'Mentor'}</p>
-                      <p className="text-xs text-gray-400">{user?.email || ''}</p>
+
+                  <div className="absolute right-0 mt-2 w-56 sm:w-64 bg-gray-800 border border-gray-700 rounded-lg shadow-lg z-20">
+                    <div className="px-3 sm:px-4 py-2 sm:py-3 border-b border-gray-700">
+                      <p className="text-xs sm:text-sm font-semibold text-white">{user?.name || 'Mentor'}</p>
+                      <p className="text-[10px] sm:text-xs text-gray-400 truncate">{user?.email || ''}</p>
                     </div>
-                    
-                    <div className="py-2">
+
+                    <div className="py-1 sm:py-2">
                       <button
                         onClick={handleLogout}
-                        className="w-full flex items-center space-x-3 px-4 py-2 text-left text-gray-300 hover:bg-gray-700 hover:text-white transition-colors duration-200"
+                        className="w-full flex items-center space-x-2 sm:space-x-3 px-3 sm:px-4 py-1.5 sm:py-2 text-left text-xs sm:text-sm text-gray-300 hover:bg-gray-700 hover:text-white transition-colors duration-200"
                       >
-                        <LogOut className="h-4 w-4" />
+                        <LogOut className="h-3 w-3 sm:h-4 sm:w-4" />
                         <span>Logout</span>
                       </button>
                     </div>
@@ -228,7 +233,7 @@ const MentorTopNavbar: React.FC<MentorTopNavbarProps> = ({ activeSection: _activ
                 <X className="h-5 w-5" />
               </button>
             </div>
-            
+
             <div className="p-6 space-y-4">
               {/* Batch Selection */}
               <div>
@@ -259,7 +264,7 @@ const MentorTopNavbar: React.FC<MentorTopNavbarProps> = ({ activeSection: _activ
                   </label>
                   <select
                     value={sessionData.section_id}
-                    onChange={(e) => setSessionData({...sessionData, section_id: e.target.value})}
+                    onChange={(e) => setSessionData({ ...sessionData, section_id: e.target.value })}
                     className="w-full border border-gray-300 rounded-lg px-3 py-2 pr-8 focus:outline-none focus:ring-2 focus:ring-yellow-400 focus:border-transparent appearance-none bg-[length:16px_16px] bg-[position:right_0.5rem_center] bg-no-repeat"
                     style={{ backgroundImage: "url(\"data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e\")" }}
                     required
@@ -281,15 +286,13 @@ const MentorTopNavbar: React.FC<MentorTopNavbarProps> = ({ activeSection: _activ
                 </label>
                 <select
                   value={sessionData.session_type}
-                  onChange={(e) => setSessionData({...sessionData, session_type: e.target.value})}
+                  onChange={(e) => setSessionData({ ...sessionData, session_type: e.target.value })}
                   className="w-full border border-gray-300 rounded-lg px-3 py-2 pr-8 focus:outline-none focus:ring-2 focus:ring-yellow-400 focus:border-transparent appearance-none bg-[length:16px_16px] bg-[position:right_0.5rem_center] bg-no-repeat"
                   style={{ backgroundImage: "url(\"data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e\")" }}
                   required
                 >
                   <option value="theory">Theory</option>
                   <option value="practical">Practical</option>
-                  <option value="lab">Lab</option>
-                  <option value="workshop">Workshop</option>
                 </select>
               </div>
 
@@ -300,7 +303,7 @@ const MentorTopNavbar: React.FC<MentorTopNavbarProps> = ({ activeSection: _activ
                 </label>
                 <select
                   value={sessionData.venue}
-                  onChange={(e) => setSessionData({...sessionData, venue: e.target.value})}
+                  onChange={(e) => setSessionData({ ...sessionData, venue: e.target.value })}
                   className="w-full border border-gray-300 rounded-lg px-3 py-2 pr-8 focus:outline-none focus:ring-2 focus:ring-yellow-400 focus:border-transparent appearance-none bg-[length:16px_16px] bg-[position:right_0.5rem_center] bg-no-repeat"
                   style={{ backgroundImage: "url(\"data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e\")" }}
                   required
@@ -323,7 +326,7 @@ const MentorTopNavbar: React.FC<MentorTopNavbarProps> = ({ activeSection: _activ
                 <input
                   type="text"
                   value={sessionData.session_title}
-                  onChange={(e) => setSessionData({...sessionData, session_title: e.target.value})}
+                  onChange={(e) => setSessionData({ ...sessionData, session_title: e.target.value })}
                   placeholder="e.g., React Fundamentals"
                   className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-yellow-400 focus:border-transparent"
                   required
@@ -338,7 +341,7 @@ const MentorTopNavbar: React.FC<MentorTopNavbarProps> = ({ activeSection: _activ
                 <input
                   type="date"
                   value={sessionData.start_date}
-                  onChange={(e) => setSessionData({...sessionData, start_date: e.target.value})}
+                  onChange={(e) => setSessionData({ ...sessionData, start_date: e.target.value })}
                   className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-yellow-400 focus:border-transparent"
                   required
                 />
@@ -352,7 +355,7 @@ const MentorTopNavbar: React.FC<MentorTopNavbarProps> = ({ activeSection: _activ
                 <input
                   type="time"
                   value={sessionData.class_time}
-                  onChange={(e) => setSessionData({...sessionData, class_time: e.target.value})}
+                  onChange={(e) => setSessionData({ ...sessionData, class_time: e.target.value })}
                   className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-yellow-400 focus:border-transparent"
                   required
                 />
@@ -365,7 +368,7 @@ const MentorTopNavbar: React.FC<MentorTopNavbarProps> = ({ activeSection: _activ
                 </label>
                 <select
                   value={sessionData.duration}
-                  onChange={(e) => setSessionData({...sessionData, duration: parseInt(e.target.value)})}
+                  onChange={(e) => setSessionData({ ...sessionData, duration: parseInt(e.target.value) })}
                   className="w-full border border-gray-300 rounded-lg px-3 py-2 pr-8 focus:outline-none focus:ring-2 focus:ring-yellow-400 focus:border-transparent appearance-none bg-[length:16px_16px] bg-[position:right_0.5rem_center] bg-no-repeat"
                   style={{ backgroundImage: "url(\"data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e\")" }}
                   required
@@ -384,7 +387,7 @@ const MentorTopNavbar: React.FC<MentorTopNavbarProps> = ({ activeSection: _activ
                 <label className="block text-sm font-medium text-gray-700 mb-2">Program</label>
                 <select
                   value={sessionData.program}
-                  onChange={(e) => setSessionData({...sessionData, program: e.target.value})}
+                  onChange={(e) => setSessionData({ ...sessionData, program: e.target.value })}
                   className="w-full border border-gray-300 rounded-lg px-3 py-2 pr-8 focus:outline-none focus:ring-2 focus:ring-yellow-400 focus:border-transparent appearance-none bg-[length:16px_16px] bg-[position:right_0.5rem_center] bg-no-repeat"
                   style={{ backgroundImage: "url(\"data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e\")" }}
                 >
@@ -403,7 +406,7 @@ const MentorTopNavbar: React.FC<MentorTopNavbarProps> = ({ activeSection: _activ
                 <input
                   type="text"
                   value={sessionData.cohort}
-                  onChange={(e) => setSessionData({...sessionData, cohort: e.target.value})}
+                  onChange={(e) => setSessionData({ ...sessionData, cohort: e.target.value })}
                   placeholder="e.g., 2024-A"
                   className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-yellow-400 focus:border-transparent"
                 />
@@ -415,13 +418,13 @@ const MentorTopNavbar: React.FC<MentorTopNavbarProps> = ({ activeSection: _activ
                 <input
                   type="text"
                   value={sessionData.location}
-                  onChange={(e) => setSessionData({...sessionData, location: e.target.value})}
+                  onChange={(e) => setSessionData({ ...sessionData, location: e.target.value })}
                   placeholder="Physical location or coordinates"
                   className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-yellow-400 focus:border-transparent"
                 />
               </div>
             </div>
-            
+
             <div className="flex items-center justify-end space-x-3 p-6 border-t border-gray-200 bg-gray-50">
               <button
                 onClick={closeScheduleModal}

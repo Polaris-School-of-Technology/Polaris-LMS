@@ -108,7 +108,6 @@ async function refreshAccessToken(refreshToken: string): Promise<string> {
         throw new Error('No access token received from refresh endpoint');
       }
 
-      // Update stored tokens
       localStorage.setItem('accessToken', newAccessToken);
       if (newRefreshToken) {
         localStorage.setItem('refreshToken', newRefreshToken);
@@ -135,13 +134,12 @@ async function lmsApiRequest(url: string, options: RequestInit = {}, token?: str
     ...(options.headers as Record<string, string>),
   };
 
-  // Multimedia service requires token - validate it's provided
+  // Multimedia service - token is optional (some routes are unsecured like /session/analytics)
   if (url.includes('multimedia') || url.includes('mm/v3')) {
-    if (!token) {
-      throw new Error('Token not provided');
+    if (token) { // Token is now optional
+      headers['Authorization'] = `Bearer ${token}`;
+      headers['x-access-token'] = token;
     }
-    headers['Authorization'] = `Bearer ${token}`;
-    headers['x-access-token'] = token;
   } else if (token) {
     // For LMS backend, only send Authorization header
     headers['Authorization'] = `Bearer ${token}`;
@@ -153,11 +151,9 @@ async function lmsApiRequest(url: string, options: RequestInit = {}, token?: str
       headers,
     });
 
-    // Read response as text first, then parse as JSON if possible
     const responseText = await response.text();
     let data;
 
-    // Try to parse as JSON
     try {
       data = responseText ? JSON.parse(responseText) : {};
     } catch (jsonError) {
@@ -201,8 +197,8 @@ async function apiRequest(url: string, options: RequestInit = {}, token?: string
   };
 
   if (token) {
-      headers['Authorization'] = `Bearer ${token}`;
-      headers['x-access-token'] = token; // Keep for backward compatibility
+    headers['Authorization'] = `Bearer ${token}`;
+    headers['x-access-token'] = token; // Keep for backward compatibility
   }
 
   const response = await fetch(url, {
@@ -216,7 +212,6 @@ async function apiRequest(url: string, options: RequestInit = {}, token?: string
     if (refreshToken) {
       try {
         const newToken = await refreshAccessToken(refreshToken);
-        // Retry the original request with new token
         headers['Authorization'] = `Bearer ${newToken}`;
         headers['x-access-token'] = newToken; // Keep for backward compatibility
         const retryResponse = await fetch(url, {
@@ -724,7 +719,7 @@ const lmsApi = {
     getAll: async (token: string) => {
       // Use adminPrograms.getAllFaculties instead of non-existent mentor/list endpoint
       return lmsApiRequest(`${LMS_BASE_URL}/api/v1/admin/programs/allFaculties`, {
-          method: 'GET',
+        method: 'GET',
       }, token);
     },
 
@@ -762,7 +757,7 @@ const lmsApi = {
 
     getAllSessions: async (mentorId: string, token: string) => {
       return lmsApiRequest(`${LMS_BASE_URL}/api/v1/schedule/faculty/${mentorId}/sessions`, {
-          method: 'GET',
+        method: 'GET',
       }, token);
     },
     getFacultyStudents: async (token: string) => {
@@ -772,17 +767,17 @@ const lmsApi = {
     },
     getTotalClasses: async (token: string) => {
       return lmsApiRequest(`${LMS_BASE_URL}/api/v1/mentor/cards/total-classes`, {
-          method: 'GET',
+        method: 'GET',
       }, token);
     },
     getTotalCourses: async (token: string) => {
       return lmsApiRequest(`${LMS_BASE_URL}/api/v1/mentor/cards/total-courses`, {
-          method: 'GET',
+        method: 'GET',
       }, token);
     },
     getAvgAttendance: async (token: string) => {
       return lmsApiRequest(`${LMS_BASE_URL}/api/v1/mentor/cards/avg-attendance`, {
-          method: 'GET',
+        method: 'GET',
       }, token);
     },
 
@@ -814,6 +809,41 @@ const lmsApi = {
       }, token);
     },
   },
+
+  batches: {
+    getAllBatches: async (token: string) => {
+      return lmsApiRequest(`${LMS_BASE_URL}/api/v1/admin/batch/batches`, {
+        method: 'GET',
+      }, token);
+    },
+
+    getBatchStudents: async (batchId: string, page: number = 1, limit: number = 10, token: string) => {
+      return lmsApiRequest(`${LMS_BASE_URL}/api/v1/admin/batch/batches/${batchId}/students?page=${page}&limit=${limit}`, {
+        method: 'GET',
+      }, token);
+    },
+
+    getBatchSessions: async (batchId: string, date: string, token: string) => {
+      return lmsApiRequest(`${LMS_BASE_URL}/api/v1/admin/batch/sessions/${date}?batch_id=${batchId}`, {
+        method: 'GET',
+      }, token);
+    },
+
+    updateBatch: async (batchId: string, name: string, token: string) => {
+      return lmsApiRequest(`${LMS_BASE_URL}/api/v1/admin/batch/batches/${batchId}/update`, {
+        method: 'PUT',
+        body: JSON.stringify({ batchId, newName: name }),
+        headers: { 'Content-Type': 'application/json' },
+      }, token);
+    },
+
+    removeStudentFromBatch: async (batchId: string, studentId: string, token: string) => {
+      return lmsApiRequest(`${LMS_BASE_URL}/api/v1/admin/batch/batches/${batchId}/students/${studentId}`, {
+        method: 'DELETE',
+      }, token);
+    },
+  },
+
 
   sessions: {
     markComplete: async (sessionId: number, token: string) => {
@@ -1095,13 +1125,48 @@ const lmsApi = {
   },
 
   adminSchedule: {
-  getFacultySessions: async (facultyId: string, token: string) => {
-    return lmsApiRequest(`${LMS_BASE_URL}/api/v1/schedule/faculty/${facultyId}/sessions?limit=1000`, {
-      method: 'GET',
-    }, token);
+    getFacultySessions: async (facultyId: string, token: string) => {
+      return lmsApiRequest(`${LMS_BASE_URL}/api/v1/schedule/faculty/${facultyId}/sessions?limit=1000`, {
+        method: 'GET',
+      }, token);
+    },
   },
-},
 
+};
+// admin analytics endpoints
+const adminAnalytics = {
+  getMentorAnalytics: async (
+    token: string,
+    start_date?: string,
+    end_date?: string,
+    page?: number,  
+    limit?: number
+  ) => {
+    const query =
+      start_date && end_date
+        ? `?start_date=${start_date}&end_date=${end_date}`
+        : `?page=${page || 1}&limit=${limit || 10}`;
+    return lmsApiRequest(
+      `${LMS_BASE_URL}/api/v1/admin/mentorStats/total-lectures${query}`,
+      {
+        method: "GET",
+      },
+      token
+    );
+  },
+  getSelectedMentorAnalytics: async (
+    token: string,
+    mentor_id: string,
+    start_date:string,
+    end_date:string)=>{
+      return lmsApiRequest(
+        `${LMS_BASE_URL}/api/v1/admin/mentorStats/${mentor_id}/lectures?start_date=${start_date}&end_date=${end_date}`,
+        {
+          method: "GET",
+        },
+        token
+      );
+    }
 };
 
 // Multimedia API functions
@@ -1119,6 +1184,18 @@ const multimediaApi = {
   sessions: {
     getAll: async (token: string) => {
       return apiRequest(`${LMS_BASE_URL}/api/v1/session/list`, {
+        method: 'GET',
+      }, token);
+    },
+
+    getEndedSessions: async (token: string, batchId?: number, facultyId?: string, limit: number = 50, offset: number = 0) => {
+      const params = new URLSearchParams();
+      if (batchId) params.append('batchId', batchId.toString());
+      if (facultyId) params.append('facultyId', facultyId);
+      params.append('limit', limit.toString());
+      params.append('offset', offset.toString());
+
+      return lmsApiRequest(`${MM_BASE_URL}/liveclass/session/ended?${params.toString()}`, {
         method: 'GET',
       }, token);
     },
@@ -1273,6 +1350,73 @@ const multimediaApi = {
       }, token);
     },
   },
+
+  attendance: {
+    // Get session attendance from multimedia service
+    getSessionAttendance: async (sessionId: number, token: string, batchId?: number, courseId?: number, search?: string, limit: number = 20, offset: number = 0) => {
+      const params = new URLSearchParams();
+      if (sessionId) params.append('sessionId', sessionId.toString());
+      if (batchId) params.append('batchId', batchId.toString());
+      if (courseId) params.append('courseId', courseId.toString());
+      if (search) params.append('search', search);
+      params.append('limit', limit.toString());
+      params.append('offset', offset.toString());
+
+      // MM_BASE_URL already contains /mm/v3
+      return lmsApiRequest(`${MM_BASE_URL}/session/attendance?${params.toString()}`, {
+        method: 'GET',
+      }, token);
+    },
+
+    // Get course attendance from multimedia service
+    getCourseAttendance: async (sessionId: number | null, courseId: number, token: string, search?: string, limit: number = 20, offset: number = 0) => {
+      const params = new URLSearchParams();
+      params.append('entityId', courseId.toString());
+      if (sessionId) params.append('liveSessionId', sessionId.toString());
+      if (search) params.append('search', search);
+      params.append('limit', limit.toString());
+      params.append('offset', offset.toString());
+
+      // MM_BASE_URL already contains /mm/v3
+      return lmsApiRequest(`${MM_BASE_URL}/session/course/attendance?${params.toString()}`, {
+        method: 'GET',
+      }, token);
+    },
+
+    // Get session analytics from multimedia service (includes 50% threshold attendance)
+    getSessionAnalytics: async (sessionId: number, token: string) => {
+      const params = new URLSearchParams();
+      params.append('sessionId', sessionId.toString());
+
+      // MM_BASE_URL already contains /mm/v3, so we don't need to add it again
+      return lmsApiRequest(`${MM_BASE_URL}/session/analytics?${params.toString()}`, {
+        method: 'GET',
+      }, token);
+    },
+
+    // Get isPresent data for a session from LMS admin batch attendance API
+    // Backend endpoint (LMS): /api/v1/admin/batch/attendance/:sessionId
+    // Expected response:
+    // {
+    //   success: true,
+    //   students: [
+    //     {
+    //       attendanceId: number,
+    //       userId: string,
+    //       sessionId: number,
+    //       isPresent: boolean,
+    //       student: { id: string, name: string, email: string }
+    //     },
+    //     ...
+    //   ]
+    // }
+    getBatchSessionAttendance: async (sessionId: number, token: string) => {
+      // Matches backend route: https://live-class-lms1-672553132888.asia-south1.run.app/api/v1/admin/batch/attendance/1081
+      return apiRequest(`${LMS_BASE_URL}/api/v1/admin/batch/attendance/${sessionId}`, {
+        method: 'GET',
+      }, token);
+    },
+  },
 };
 
 // Dashboard API functions
@@ -1332,11 +1476,9 @@ export const vodApi = {
           token
         );
       } catch (error: any) {
-        // If the error is about multiple rows, it means the student has multiple batches
         if (error.message?.includes('multiple (or no) rows returned')) {
           console.warn(`Student ${studentId} has multiple batches, this needs backend fix`);
-          
-          // For testing, use the working student ID
+
           if (studentId !== '08faa382-56d6-4a7c-9482-ef6efdfa5bea') {
             console.log('Falling back to test student ID');
             return await apiRequest(
@@ -1348,6 +1490,13 @@ export const vodApi = {
         }
         throw error;
       }
+    },
+    getMasterPlaylist: async (sessionId: number, token: string) => {
+      return await apiRequest(
+        `${VOD_BASE_URL}/sessions/${sessionId}/master-playlist`,
+        { method: 'GET' },
+        token
+      );
     },
   },
 };
@@ -1499,10 +1648,19 @@ export const useApi = () => {
       adminSchedule: {
         getFacultySessions: (facultyId: string) => lmsApi.adminSchedule.getFacultySessions(facultyId, token),
       },
+      batches: {
+        getAllBatches: () => lmsApi.batches.getAllBatches(token),
+        getBatchStudents: (batchId: string, page: number, limit: number) => lmsApi.batches.getBatchStudents(batchId, page, limit, token),
+        getBatchSessions: (batchId: string, date: string) => lmsApi.batches.getBatchSessions(batchId, date, token),
+        updateBatch: (batchId: string, name: string) => lmsApi.batches.updateBatch(batchId, name, token),
+        removeStudentFromBatch: (batchId: string, studentId: string) => lmsApi.batches.removeStudentFromBatch(batchId, studentId, token),
+      },
     },
     multimedia: {
       sessions: {
         getAll: () => multimediaApi.sessions.getAll(token),
+        getEndedSessions: (batchId?: number, facultyId?: string, limit?: number, offset?: number) =>
+          multimediaApi.sessions.getEndedSessions(token, batchId, facultyId, limit || 50, offset || 0),
         getStats: () => multimediaApi.sessions.getStats(token),
         getUpcoming: () => multimediaApi.sessions.getUpcoming(token),
         startSession: (sessionId: number, facultyId: string, batchId: number, facultyName: string) =>
@@ -1517,11 +1675,28 @@ export const useApi = () => {
         getSessionReport: (filters: any) => multimediaApi.reports.getSessionReport(filters, token),
         getCourseReport: (filters: any) => multimediaApi.reports.getCourseReport(filters, token),
       },
+      attendance: {
+        getSessionAttendance: (sessionId: number, batchId?: number, courseId?: number, search?: string, limit?: number, offset?: number) =>
+          multimediaApi.attendance.getSessionAttendance(sessionId, token, batchId, courseId, search, limit || 20, offset || 0),
+        getCourseAttendance: (sessionId: number | null, courseId: number, search?: string, limit?: number, offset?: number) =>
+          multimediaApi.attendance.getCourseAttendance(sessionId, courseId, token, search, limit || 20, offset || 0),
+        getSessionAnalytics: (sessionId: number) =>
+          multimediaApi.attendance.getSessionAnalytics(sessionId, token),
+        getBatchSessionAttendance: (sessionId: number) =>
+          multimediaApi.attendance.getBatchSessionAttendance(sessionId, token),
+      },
     },
     dashboard: {
       getSummaryStats: () => dashboardApi.getSummaryStats(token),
       getRecentActivities: () => dashboardApi.getRecentActivities(token),
     },
+    adminAnalytics: {
+      mentorsAnalytics: (start_date?: string, end_date?: string, page?: number, limit?: number) =>
+        adminAnalytics.getMentorAnalytics(token, start_date, end_date, page, limit),
+      lecturesAnalytics: (mentor_id: string, start_date:string, end_date:string) =>
+        adminAnalytics.getSelectedMentorAnalytics(token, mentor_id, start_date, end_date),
+    },
+
   }), [token, refreshToken]);
 
   return apiFunctions;

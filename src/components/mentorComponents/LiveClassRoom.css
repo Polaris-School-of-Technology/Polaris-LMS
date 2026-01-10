@@ -61,8 +61,17 @@
 }
 
 @keyframes livePulse {
-  0%, 100% { opacity: 1; box-shadow: 0 4px 12px rgba(239, 68, 68, 0.4); }
-  50% { opacity: 0.8; box-shadow: 0 4px 20px rgba(239, 68, 68, 0.6); }
+
+  0%,
+  100% {
+    opacity: 1;
+    box-shadow: 0 4px 12px rgba(239, 68, 68, 0.4);
+  }
+
+  50% {
+    opacity: 0.8;
+    box-shadow: 0 4px 20px rgba(239, 68, 68, 0.6);
+  }
 }
 
 .room-stats {
@@ -84,10 +93,12 @@
 
 .video-container {
   flex: 1;
-  padding: 24px;
+  padding: 16px;
   overflow-y: auto;
   position: relative;
   z-index: 1;
+  display: flex;
+  flex-direction: column;
 }
 
 .no-peers {
@@ -110,37 +121,73 @@
 }
 
 @keyframes float {
-  0%, 100% { transform: translateY(0px); }
-  50% { transform: translateY(-20px); }
+
+  0%,
+  100% {
+    transform: translateY(0px);
+  }
+
+  50% {
+    transform: translateY(-20px);
+  }
 }
 
 .video-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
-  gap: 20px;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 16px;
   animation: fadeIn 0.5s ease-out;
 }
 
 @keyframes fadeIn {
-  from { opacity: 0; transform: translateY(10px); }
-  to { opacity: 1; transform: translateY(0); }
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 @media (min-width: 1400px) {
   .video-grid {
-    grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 12px;
+    width: 100%;
+  }
+}
+
+/* Student view: smaller peer tiles */
+.live-class-room.student-live .video-grid {
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 12px;
+}
+
+@media (min-width: 1400px) {
+  .live-class-room.student-live .video-grid {
+    grid-template-columns: repeat(4, 1fr);
+    gap: 10px;
   }
 }
 
 .video-tile {
   position: relative;
-  background: linear-gradient(135deg, #374151 0%, #1f2937 100%);
-  border-radius: 16px;
+  background: #2d2d3d;
+  border-radius: 12px;
   overflow: hidden;
-  aspect-ratio: 16 / 9;
-  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
-  border: 2px solid rgba(255, 255, 255, 0.1);
-  transition: all 0.3s ease;
+  aspect-ratio: 16/9;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+/* Smaller tiles for student view */
+.live-class-room.student-live .video-tile {
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
 }
 
 .video-tile.pinned {
@@ -159,6 +206,7 @@
   width: 100%;
   height: 100%;
   object-fit: cover;
+  display: block;
 }
 
 .no-video-fallback {
@@ -175,17 +223,25 @@
 
 .peer-info {
   position: absolute;
-  bottom: 16px;
-  left: 16px;
-  right: 16px;
+  bottom: 8px;
+  left: 8px;
+  right: 8px;
   display: flex;
   justify-content: space-between;
   align-items: center;
   background: rgba(0, 0, 0, 0.7);
   backdrop-filter: blur(10px);
-  padding: 10px 16px;
-  border-radius: 12px;
+  padding: 6px 10px;
+  border-radius: 8px;
   border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+/* Smaller peer info for student view */
+.live-class-room.student-live .peer-info {
+  padding: 4px 8px;
+  bottom: 6px;
+  left: 6px;
+  right: 6px;
 }
 
 .peer-name {
@@ -193,6 +249,11 @@
   font-size: 15px;
   font-weight: 700;
   text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+}
+
+/* Smaller peer name for student view */
+.live-class-room.student-live .peer-name {
+  font-size: 12px;
 }
 
 .muted-indicator {
@@ -203,16 +264,24 @@
 }
 
 @keyframes pulse {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.5; }
+
+  0%,
+  100% {
+    opacity: 1;
+  }
+
+  50% {
+    opacity: 0.5;
+  }
 }
 
 .room-controls {
+  height: 70px;
   display: flex;
   justify-content: center;
   align-items: center;
   gap: 20px;
-  padding: 24px 32px;
+  padding: 10px 22px;
   background: rgba(45, 45, 61, 0.8);
   backdrop-filter: blur(20px);
   border-top: 1px solid rgba(255, 255, 255, 0.1);
@@ -222,8 +291,8 @@
 }
 
 .control-btn {
-  width: 64px;
-  height: 64px;
+  width: 54px;
+  height: 54px;
   border: none;
   border-radius: 50%;
   background: linear-gradient(135deg, #4b5563 0%, #374151 100%);
@@ -274,8 +343,15 @@
 }
 
 @keyframes disabledPulse {
-  0%, 100% { box-shadow: 0 4px 16px rgba(239, 68, 68, 0.5); }
-  50% { box-shadow: 0 4px 24px rgba(239, 68, 68, 0.7); }
+
+  0%,
+  100% {
+    box-shadow: 0 4px 16px rgba(239, 68, 68, 0.5);
+  }
+
+  50% {
+    box-shadow: 0 4px 24px rgba(239, 68, 68, 0.7);
+  }
 }
 
 .control-btn.active {
@@ -285,8 +361,15 @@
 }
 
 @keyframes activePulse {
-  0%, 100% { box-shadow: 0 4px 16px rgba(16, 185, 129, 0.5); }
-  50% { box-shadow: 0 4px 24px rgba(16, 185, 129, 0.7); }
+
+  0%,
+  100% {
+    box-shadow: 0 4px 16px rgba(16, 185, 129, 0.5);
+  }
+
+  50% {
+    box-shadow: 0 4px 24px rgba(16, 185, 129, 0.7);
+  }
 }
 
 .leave-btn {
@@ -338,7 +421,7 @@
 }
 
 .room-footer {
-  padding: 16px 32px;
+  padding: 6px 32px;
   background: rgba(45, 45, 61, 0.6);
   backdrop-filter: blur(20px);
   text-align: center;
@@ -363,8 +446,15 @@
 }
 
 @keyframes recordingBlink {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.3; }
+
+  0%,
+  100% {
+    opacity: 1;
+  }
+
+  50% {
+    opacity: 0.3;
+  }
 }
 
 .live-class-error,
@@ -391,8 +481,15 @@
 }
 
 @keyframes slideUp {
-  from { opacity: 0; transform: translateY(20px); }
-  to { opacity: 1; transform: translateY(0); }
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .error-card h2 {
@@ -420,8 +517,13 @@
 }
 
 @keyframes spin {
-  0% { transform: rotate(0deg); }
-  100% { transform: rotate(360deg); }
+  0% {
+    transform: rotate(0deg);
+  }
+
+  100% {
+    transform: rotate(360deg);
+  }
 }
 
 .live-class-loading {
@@ -436,8 +538,15 @@
 }
 
 @keyframes fadeInOut {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.5; }
+
+  0%,
+  100% {
+    opacity: 1;
+  }
+
+  50% {
+    opacity: 0.5;
+  }
 }
 
 .btn {
@@ -538,8 +647,80 @@
   from {
     transform: translateX(100%);
   }
+
   to {
     transform: translateX(0);
   }
 }
 
+.screen-share-container {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-bottom: 12px;
+  min-height: 0;
+  height: 100%;
+}
+
+.screen-share-main {
+  flex: 1;
+  background: black;
+  border-radius: 16px;
+  overflow: hidden;
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.3);
+}
+
+.screen-share-video {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.screen-share-label {
+  position: absolute;
+  bottom: 24px;
+  left: 24px;
+  background: rgba(0, 0, 0, 0.8);
+  color: white;
+  padding: 8px 16px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 600;
+  backdrop-filter: blur(4px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.video-container.screen-share-active {
+  padding: 0;
+}
+
+.video-container.screen-share-active .screen-share-container {
+  margin-bottom: 0;
+  gap: 0;
+}
+
+.video-container.screen-share-active .screen-share-main {
+  border-radius: 0;
+  border: none;
+}
+
+.video-grid.compact {
+  height: 120px;
+  flex: none;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  background: #111827;
+  /* Dark background for the strip */
+  padding: 8px;
+}
+
+.video-grid.compact .video-tile {
+  aspect-ratio: 16/9;
+}

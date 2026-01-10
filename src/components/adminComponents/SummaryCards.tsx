@@ -53,10 +53,7 @@ const SummaryCards: React.FC = () => {
           avgAttendance: mentorAvgAttendance, // Use mentor dashboard stats for consistency
           totalPrograms: activePrograms.length
         };
-
-
         if (!isMounted) return; // Prevent state update if component unmounted
-
         const kpiData: KPI[] = [
           {
             title: 'Total Mentors',
@@ -83,7 +80,6 @@ const SummaryCards: React.FC = () => {
             icon: 'BarChart'
           }
         ];
-
         setKpis(kpiData);
       } catch (err: any) {
 

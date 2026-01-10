@@ -17,12 +17,11 @@ const MentorDashboardContent: React.FC<MentorDashboardContentProps> = ({ activeS
       case 'overview':
       case 'students':
       case 'schedule':
-      case 'sessions':
       case 'recordings':
       case 'analytics':
-        return <MentorOverview activeSection={activeSection} setActiveSection={() => {}} />;
+        return <MentorOverview activeSection={activeSection} setActiveSection={() => { }} />;
       default:
-        return <MentorOverview activeSection={activeSection} setActiveSection={() => {}} />;
+        return <MentorOverview activeSection={activeSection} setActiveSection={() => { }} />;
     }
   };
 
