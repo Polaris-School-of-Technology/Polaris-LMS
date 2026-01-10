@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
-import { ArrowRight, Eye, EyeOff, Mail, Lock, User } from 'lucide-react';
+import { useState } from 'react';
+import { ArrowRight, Eye, EyeOff, Mail, Lock } from 'lucide-react';
 import { publicAuthApi } from '../../services/api';
+import { useGoogleLogin } from '@react-oauth/google';
 
 interface AuthFormProps {
   userType: 'student' | 'faculty' | 'admin';
@@ -60,41 +61,47 @@ const AuthForm: React.FC<AuthFormProps> = ({ userType, onLogin }) => {
   const info = getUserTypeInfo();
 
   // --- Google Auth ---
-  const handleGoogleAuth = async () => {
-    setLoading(true);
-    setError('');
-    try {
-      let testEmail = '';
-      let authFunction: (token: string) => Promise<{ user: any; token: string | null }>;
+  const googleLogin = useGoogleLogin({
+    onSuccess: async (tokenResponse) => {
+      setLoading(true);
+      setError('');
+      try {
+        let authFunction: (token: string) => Promise<{ user: any; token: string | null; refreshToken?: string }>;
 
-      switch (userType) {
-        case 'student':
-          testEmail = 'nitish.p24@medhaviskillsuniversity.edu.in';
-          authFunction = publicAuthApi.studentGoogleLogin;
-          break;
-        case 'faculty':
-          testEmail = 'ananya.sharma@polariscampus.com';
-          authFunction = publicAuthApi.facultyGoogleLogin;
-          break;
-        case 'admin':
-          testEmail = 'kshitiz.dhooria@classplus.co';
-          authFunction = publicAuthApi.adminGoogleLogin;
-          break;
+        switch (userType) {
+          case 'student':
+            authFunction = publicAuthApi.studentGoogleLogin;
+            break;
+          case 'faculty':
+            authFunction = publicAuthApi.facultyGoogleLogin;
+            break;
+          case 'admin':
+            authFunction = publicAuthApi.adminGoogleLogin;
+            break;
+        }
+
+        // Send the access token to the backend
+        const result = await authFunction(tokenResponse.access_token);
+
+        if (result.token) {
+          onLogin(result.user, result.token, result.refreshToken);
+        } else {
+          throw new Error('No authentication token received');
+        }
+      } catch (err: any) {
+        setError(err.message || 'Google authentication failed');
+      } finally {
+        setLoading(false);
       }
-
-      const mockToken = `mock_google_token_for_${testEmail}`;
-      const result = await authFunction(mockToken);
-
-      if (result.token) {
-        onLogin(result.user, result.token, result.refreshToken);
-      } else {
-        throw new Error('No authentication token received');
-      }
-    } catch (err: any) {
-      setError(err.message || 'Google authentication failed');
-    } finally {
+    },
+    onError: () => {
+      setError('Google authentication failed');
       setLoading(false);
     }
+  });
+
+  const handleGoogleAuth = () => {
+    googleLogin();
   };
 
   // --- Email Login ---
@@ -105,9 +112,9 @@ const AuthForm: React.FC<AuthFormProps> = ({ userType, onLogin }) => {
 
     try {
       const credentials = { email: formData.email, password: formData.password };
-      
+
       // Use appropriate auth function based on user type
-      const result = userType === 'faculty' 
+      const result = userType === 'faculty'
         ? await publicAuthApi.facultyEmailLogin(credentials)
         : await publicAuthApi.login(credentials);
 
