@@ -44,7 +44,7 @@ const AuthForm: React.FC<AuthFormProps> = ({ userType, onLogin }) => {
           emailRestriction: 'Faculty accounts must be created by administrators',
           allowSignup: false,
           googleOnly: false,
-          allowGoogleAuth: true
+          allowGoogleAuth: false
         };
       case 'admin':
         return {
