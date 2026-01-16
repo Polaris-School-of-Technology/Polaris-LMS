@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { X, Loader2 } from 'lucide-react';
 import { useApi } from '../../services/api';
-import type { Group } from '../../types'; 
+import MultiSelect from '../ui/MultiSelect';
+import type { Group } from '../../types';
 
 interface GroupModalProps {
   isOpen: boolean;
@@ -23,8 +24,8 @@ const GroupModal: React.FC<GroupModalProps> = ({ isOpen, onClose, group, mode })
   const [dropdownLoading, setDropdownLoading] = useState(false);
   const [dropdownError, setDropdownError] = useState<string | null>(null);
   const [selectedCourseId, setSelectedCourseId] = useState<number | ''>('');
-  const [selectedFacultyId, setSelectedFacultyId] = useState<string>('');
-  
+  const [selectedFacultyIds, setSelectedFacultyIds] = useState<(string | number)[]>([]);
+
   useEffect(() => {
     if (group && mode === 'edit') {
       setEditData({ id: group.id, name: group.name });
@@ -32,7 +33,7 @@ const GroupModal: React.FC<GroupModalProps> = ({ isOpen, onClose, group, mode })
       setEditData({ id: '', name: '' });
     }
   }, [group, mode]);
-  
+
   const isCreating = mode === 'edit' && !group;
 
   useEffect(() => {
@@ -41,7 +42,7 @@ const GroupModal: React.FC<GroupModalProps> = ({ isOpen, onClose, group, mode })
       setFacultyOptions([]);
       setDropdownError(null);
       setSelectedCourseId('');
-      setSelectedFacultyId('');
+      setSelectedFacultyIds([]);
       setDropdownLoading(false);
       return;
     }
@@ -77,7 +78,7 @@ const GroupModal: React.FC<GroupModalProps> = ({ isOpen, onClose, group, mode })
   const handleSave = async () => {
     try {
       setLoading(true);
-  
+
       if (isCreating) {
         const batchName = (editData.name || '').trim();
         if (!batchName) {
@@ -90,8 +91,8 @@ const GroupModal: React.FC<GroupModalProps> = ({ isOpen, onClose, group, mode })
           setLoading(false);
           return;
         }
-        if (!selectedFacultyId) {
-          alert('Please select a mentor.');
+        if (selectedFacultyIds.length === 0) {
+          alert('Please select at least one mentor.');
           setLoading(false);
           return;
         }
@@ -99,14 +100,14 @@ const GroupModal: React.FC<GroupModalProps> = ({ isOpen, onClose, group, mode })
         const payload = {
           batchName,
           courseId: Number(selectedCourseId),
-          facultyId: selectedFacultyId
+          facultyIds: selectedFacultyIds
         };
 
         const response = await api.lms.adminMentors.createMentorGroup(payload);
 
         console.log('Creating Group:', payload);
         console.log('Response:', response);
-        
+
         alert(`Group created successfully: ${batchName}`);
       } else {
         const groupName = (editData.name || '').trim();
@@ -118,15 +119,15 @@ const GroupModal: React.FC<GroupModalProps> = ({ isOpen, onClose, group, mode })
 
         const payload = { group_name: groupName };
         const response = await api.lms.adminGroups.editGroup(editData.id!, payload);
-        
+
         console.log('Updating Group:', payload);
         console.log('Response:', response);
-        
+
         alert(`Group updated successfully: ${groupName}`);
       }
-  
+
       onClose();
-      
+
     } catch (error: any) {
       console.error('Error saving group:', error);
       alert(`Error saving group: ${error.message || 'Unknown error'}`);
@@ -173,7 +174,7 @@ const GroupModal: React.FC<GroupModalProps> = ({ isOpen, onClose, group, mode })
                   {dropdownError}
                 </div>
               )}
-              
+
               {/* Batch Name */}
               <div className="col-span-2 bg-gray-800/50 rounded-xl p-6 border border-gray-700/50">
                 <label className="block text-sm font-medium text-gray-300 mb-3">
@@ -220,21 +221,18 @@ const GroupModal: React.FC<GroupModalProps> = ({ isOpen, onClose, group, mode })
                   {/* Mentor */}
                   <div className="bg-gray-800/50 rounded-xl p-6 border border-gray-700/50">
                     <label className="block text-sm font-medium text-gray-300 mb-3">
-                      Mentor
+                      Mentors
                     </label>
-                    <select
-                      value={selectedFacultyId}
-                      onChange={(e) => setSelectedFacultyId(e.target.value)}
-                      className="w-full h-12 px-4 bg-gray-800 border border-gray-700 text-white rounded-lg focus:border-yellow-500 focus:ring-2 focus:ring-yellow-500/20 focus:outline-none transition-all duration-200"
+                    <MultiSelect
+                      options={facultyOptions.map(f => ({
+                        value: f.user_id,
+                        label: f.profiles?.name || f.name || 'Unnamed Mentor'
+                      }))}
+                      value={selectedFacultyIds}
+                      onChange={(newValues) => setSelectedFacultyIds(newValues)}
                       disabled={dropdownLoading}
-                    >
-                      <option value="">{dropdownLoading ? 'Loading mentors...' : 'Select Mentor'}</option>
-                      {facultyOptions.map((faculty) => (
-                        <option key={faculty.user_id} value={faculty.user_id}>
-                          {faculty?.profiles?.name || faculty?.name || 'Unnamed Mentor'}
-                        </option>
-                      ))}
-                    </select>
+                      placeholder={dropdownLoading ? 'Loading mentors...' : 'Select Mentors'}
+                    />
                   </div>
                 </>
               )}
