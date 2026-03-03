@@ -842,6 +842,23 @@ const lmsApi = {
         method: 'DELETE',
       }, token);
     },
+
+    /** Change mentor for a batch. Validates batchId; skips request if invalid (e.g. undefined). */
+    changeMentorForBatch: async (
+      batchId: number | string | undefined | null,
+      body: { programId: number; fromMentorId: string; toMentorId: string; updateFutureSessions?: boolean },
+      token: string
+    ) => {
+      const id = typeof batchId === 'number' ? batchId : Number(batchId);
+      if (batchId == null || batchId === '' || batchId === 'undefined' || !Number.isInteger(id) || id < 1) {
+        return Promise.reject(new Error('Valid batchId is required to change mentor'));
+      }
+      return lmsApiRequest(`${LMS_BASE_URL}/api/v1/admin/batch/batches/${id}/change-mentor`, {
+        method: 'PUT',
+        body: JSON.stringify(body),
+        headers: { 'Content-Type': 'application/json' },
+      }, token);
+    },
   },
 
 
@@ -1671,6 +1688,8 @@ export const useApi = () => {
         getBatchSessions: (batchId: string, date: string) => lmsApi.batches.getBatchSessions(batchId, date, token),
         updateBatch: (batchId: string, name: string) => lmsApi.batches.updateBatch(batchId, name, token),
         removeStudentFromBatch: (batchId: string, studentId: string) => lmsApi.batches.removeStudentFromBatch(batchId, studentId, token),
+        changeMentorForBatch: (batchId: number | string | undefined | null, body: { programId: number; fromMentorId: string; toMentorId: string; updateFutureSessions?: boolean }) =>
+          lmsApi.batches.changeMentorForBatch(batchId, body, token),
       },
     },
     multimedia: {

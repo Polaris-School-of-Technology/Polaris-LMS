@@ -99,14 +99,10 @@ const GroupModal: React.FC<GroupModalProps> = ({ isOpen, onClose, group, mode })
         const payload = {
           batchName,
           courseId: Number(selectedCourseId),
-          facultyId: selectedFacultyId
+          facultyId: Array.isArray(selectedFacultyId) ? selectedFacultyId : [selectedFacultyId]
         };
 
-        const response = await api.lms.adminMentors.createMentorGroup(payload);
-
-        console.log('Creating Group:', payload);
-        console.log('Response:', response);
-        
+        await api.lms.adminMentors.createMentorGroup(payload);
         alert(`Group created successfully: ${batchName}`);
       } else {
         const groupName = (editData.name || '').trim();
@@ -117,11 +113,7 @@ const GroupModal: React.FC<GroupModalProps> = ({ isOpen, onClose, group, mode })
         }
 
         const payload = { group_name: groupName };
-        const response = await api.lms.adminGroups.editGroup(editData.id!, payload);
-        
-        console.log('Updating Group:', payload);
-        console.log('Response:', response);
-        
+        await api.lms.adminGroups.editGroup(editData.id!, payload);
         alert(`Group updated successfully: ${groupName}`);
       }
   
