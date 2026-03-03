@@ -417,28 +417,39 @@ const ProgramModal: React.FC<ProgramModalProps> = ({
 
   // --- Actions ---
   const handleSave = async (e?: React.FormEvent) => {
-   
-    
-      
-      
     if (e) {
       e.preventDefault();
     }
-    console.log(program)
- const programId = program?.originalProgramId;
-    const batchId =program?.batchId
+
+    const programId = program?.originalProgramId;
+    const batchId = program?.batchId;
     const mentorIds = newMentorsToAdd.map((m) => m.mentor_id);
-   const fromMentorId = mentorToAssign.from?.mentor_id || "";
-   const toMentorId = mentorToAssign.to?.mentor_id || "";
- try {
-  const result = await api.lms.adminPrograms.addSwapMentor(mentorIds,programId as string,batchId as string,fromMentorId,toMentorId,mentorActionMode);
-  console.log(result);
-  
- } catch (error) {
-  console.log(error);
-  
- }
-    if (mode === "edit" && !program) {
+    const fromMentorId = mentorToAssign.from?.mentor_id || "";
+    const toMentorId = mentorToAssign.to?.mentor_id || "";
+
+    const hasValidBatch = batchId != null && batchId !== "" && Number(batchId) >= 1;
+    const hasSwapIntent = mentorActionMode === "swap" && fromMentorId && toMentorId;
+    const hasAddIntent = mentorActionMode === "add" && mentorIds.length > 0;
+    if (
+      programId &&
+      hasValidBatch &&
+      (hasSwapIntent || hasAddIntent)
+    ) {
+      try {
+        await api.lms.adminPrograms.addSwapMentor(
+          mentorIds,
+          programId as string,
+          batchId as string,
+          fromMentorId,
+          toMentorId,
+          mentorActionMode
+        );
+      } catch (error) {
+        console.error("Mentor swap/add failed:", error);
+      }
+    }
+
+    if ((mode === "edit" || mode === "add") && !program) {
       try {
         setLoading(true);
 

@@ -93,15 +93,11 @@ const BulkUploadModal: React.FC<BulkUploadModalProps> = ({
       const formData = new FormData();
       formData.append("file", selectedFile);
 
-      console.log("FormData created with file");
-
       try {
         const result = await api.lms.adminStudents.bulkUploadStudents(formData);
 
         clearInterval(progressInterval);
         setUploadProgress(100);
-
-        console.log("Upload response:", result);
 
         // Check for success in the response
         if (result.success || result.message?.includes("success")) {
@@ -221,21 +217,21 @@ const BulkUploadModal: React.FC<BulkUploadModalProps> = ({
             </div>
           </div>
 
-          {/* CSV Format Info */}
+          {/* CSV Format Info (backend expects email, batch_name) */}
           <div className="bg-gray-800 p-4 rounded-lg">
             <h3 className="text-sm font-medium text-gray-300 mb-2">
               CSV Format Required:
             </h3>
             <div className="text-xs text-gray-400 space-y-1">
-              <p>• First row should contain headers: name, email, rollNumber</p>
-              <p>• Each subsequent row should contain student data</p>
+              <p>• Headers: <strong className="text-gray-300">email</strong>, <strong className="text-gray-300">batch_name</strong></p>
+              <p>• Students must already exist (have an account with that email). One batch per file; batch_name is taken from the first row.</p>
               <p>• Example:</p>
               <div className="bg-gray-700 p-2 rounded mt-2 font-mono text-xs">
-                name,email,rollNumber
+                email,batch_name
                 <br />
-                John Doe,john.doe@example.com,STU001
+                john.doe@example.com,Batch 2024-A
                 <br />
-                Jane Smith,jane.smith@example.com,STU002
+                jane.smith@example.com,Batch 2024-A
               </div>
             </div>
           </div>

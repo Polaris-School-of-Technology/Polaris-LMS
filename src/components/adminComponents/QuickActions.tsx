@@ -133,8 +133,8 @@ const QuickActions: React.FC<QuickActionsProps> = ({
                   </button>
                 </div>
                 <div className="text-xs text-gray-300 space-y-3">
-                  <p>• First row should contain headers: <code className="bg-gray-800 px-1 rounded">name, email, rollNumber</code></p>
-                  <p>• Each subsequent row should contain student data</p>
+                  <p>• Headers: <code className="bg-gray-800 px-1 rounded">email</code>, <code className="bg-gray-800 px-1 rounded">batch_name</code></p>
+                  <p>• Students must already exist (same email in system). One batch per file.</p>
                   <p>• Example CSV structure:</p>
                   
                   {/* CSV Grid Table */}
@@ -142,26 +142,22 @@ const QuickActions: React.FC<QuickActionsProps> = ({
                     <table className="w-full text-xs">
                       <thead>
                         <tr className="bg-gray-700">
-                          <th className="px-3 py-2 text-left font-semibold text-yellow-400 border-r border-gray-600">name</th>
                           <th className="px-3 py-2 text-left font-semibold text-yellow-400 border-r border-gray-600">email</th>
-                          <th className="px-3 py-2 text-left font-semibold text-yellow-400">rollNumber</th>
+                          <th className="px-3 py-2 text-left font-semibold text-yellow-400">batch_name</th>
                         </tr>
                       </thead>
                       <tbody>
                         <tr className="border-t border-gray-600">
-                          <td className="px-3 py-2 text-gray-200 border-r border-gray-600">John Doe</td>
                           <td className="px-3 py-2 text-gray-200 border-r border-gray-600">john.doe@example.com</td>
-                          <td className="px-3 py-2 text-gray-200">STU001</td>
+                          <td className="px-3 py-2 text-gray-200">Batch 2024-A</td>
                         </tr>
                         <tr className="border-t border-gray-600">
-                          <td className="px-3 py-2 text-gray-200 border-r border-gray-600">Jane Smith</td>
                           <td className="px-3 py-2 text-gray-200 border-r border-gray-600">jane.smith@example.com</td>
-                          <td className="px-3 py-2 text-gray-200">STU002</td>
+                          <td className="px-3 py-2 text-gray-200">Batch 2024-A</td>
                         </tr>
                         <tr className="border-t border-gray-600">
-                          <td className="px-3 py-2 text-gray-200 border-r border-gray-600">Mike Johnson</td>
                           <td className="px-3 py-2 text-gray-200 border-r border-gray-600">mike.johnson@example.com</td>
-                          <td className="px-3 py-2 text-gray-200">STU003</td>
+                          <td className="px-3 py-2 text-gray-200">Batch 2024-A</td>
                         </tr>
                       </tbody>
                     </table>

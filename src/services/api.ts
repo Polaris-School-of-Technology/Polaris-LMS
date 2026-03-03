@@ -1038,20 +1038,23 @@ const lmsApi = {
       }, token);
     },
 
-    addSwapMentor: async (mentorIds: Array<any>, programId: string,batchId: string, fromMentorId: string, toMentorId: string, mentorActionMode:string,token: string) => {
-      if(mentorActionMode==="swap"){
-        return lmsApiRequest(`${LMS_BASE_URL}/api/v1/admin/batch/batches/${batchId}/change-mentor`, {
+    addSwapMentor: async (mentorIds: Array<any>, programId: string, batchId: string, fromMentorId: string, toMentorId: string, mentorActionMode: string, token: string) => {
+      const id = batchId != null ? Number(batchId) : NaN;
+      if (batchId == null || batchId === '' || batchId === 'undefined' || !Number.isInteger(id) || id < 1) {
+        return Promise.reject(new Error('Valid batchId is required to swap or add mentor'));
+      }
+      if (mentorActionMode === 'swap') {
+        return lmsApiRequest(`${LMS_BASE_URL}/api/v1/admin/batch/batches/${id}/change-mentor`, {
           method: 'PUT',
-          body: JSON.stringify({  programId, fromMentorId, toMentorId }),
-          headers: { 'Content-Type': 'application/json' },
-        }, token);
-      }else{
-        return lmsApiRequest(`${LMS_BASE_URL}/api/v1/admin/batch/batches/${batchId}/add-mentor`, {
-          method: 'POST',
-          body: JSON.stringify({  programId, mentorIds ,updateFutureSessions:true}),
+          body: JSON.stringify({ programId, fromMentorId, toMentorId }),
           headers: { 'Content-Type': 'application/json' },
         }, token);
       }
+      return lmsApiRequest(`${LMS_BASE_URL}/api/v1/admin/batch/batches/${id}/add-mentor`, {
+        method: 'POST',
+        body: JSON.stringify({ programId, mentorIds, updateFutureSessions: true }),
+        headers: { 'Content-Type': 'application/json' },
+      }, token);
     },
   },
 
