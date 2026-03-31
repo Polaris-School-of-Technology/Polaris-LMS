@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
-import { ArrowRight, Eye, EyeOff, Mail, Lock, User } from 'lucide-react';
+import { useState } from 'react';
+import { ArrowRight, Eye, EyeOff, Mail, Lock } from 'lucide-react';
 import { publicAuthApi } from '../../services/api';
+import { useGoogleLogin } from '@react-oauth/google';
 
 interface AuthFormProps {
   userType: 'student' | 'faculty' | 'admin';
@@ -43,7 +44,7 @@ const AuthForm: React.FC<AuthFormProps> = ({ userType, onLogin }) => {
           emailRestriction: 'Faculty accounts must be created by administrators',
           allowSignup: false,
           googleOnly: false,
-          allowGoogleAuth: true
+          allowGoogleAuth: false
         };
       case 'admin':
         return {
@@ -52,7 +53,7 @@ const AuthForm: React.FC<AuthFormProps> = ({ userType, onLogin }) => {
           emailRestriction: 'Admin access is restricted to authorized personnel',
           allowSignup: false,
           googleOnly: false,
-          allowGoogleAuth: true
+          allowGoogleAuth: false
         };
     }
   };
@@ -60,76 +61,47 @@ const AuthForm: React.FC<AuthFormProps> = ({ userType, onLogin }) => {
   const info = getUserTypeInfo();
 
   // --- Google Auth ---
-  const handleGoogleAuth = async () => {
-    setLoading(true);
-    setError('');
+  const googleLogin = useGoogleLogin({
+    onSuccess: async (tokenResponse) => {
+      setLoading(true);
+      setError('');
+      try {
+        let authFunction: (token: string) => Promise<{ user: any; token: string | null; refreshToken?: string }>;
 
-    try {
-      // Initialize Google Sign-In
-      const google = (window as any).google;
-      if (!google) {
-        throw new Error('Google Sign-In library not loaded');
-      }
-
-      // Get Google Client ID from environment
-      const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
-      if (!clientId) {
-        throw new Error('Google Client ID not configured');
-      }
-
-      // Define callback function
-      (window as any).handleGoogleCallback = async (response: any) => {
-        try {
-          const idToken = response.credential;
-
-          // Call appropriate backend endpoint with the token
-          let authFunction;
-          switch (userType) {
-            case 'student':
-              authFunction = publicAuthApi.studentGoogleLogin;
-              break;
-            case 'faculty':
-              authFunction = publicAuthApi.facultyGoogleLogin;
-              break;
-            case 'admin':
-              authFunction = publicAuthApi.adminGoogleLogin;
-              break;
-          }
-
-          const result = await authFunction(idToken);
-
-          if (result.token) {
-            onLogin(result.user, result.token, result.refreshToken);
-          } else {
-            throw new Error('No authentication token received');
-          }
-        } catch (err: any) {
-          setError(err.message || 'Google authentication failed');
-        } finally {
-          setLoading(false);
+        switch (userType) {
+          case 'student':
+            authFunction = publicAuthApi.studentGoogleLogin;
+            break;
+          case 'faculty':
+            authFunction = publicAuthApi.facultyGoogleLogin;
+            break;
+          case 'admin':
+            authFunction = publicAuthApi.adminGoogleLogin;
+            break;
         }
-      };
 
-      // Initialize with simpler approach
-      google.accounts.id.initialize({
-        client_id: clientId,
-        callback: (window as any).handleGoogleCallback
-      });
+        // Send the access token to the backend
+        const result = await authFunction(tokenResponse.access_token);
 
-      // Render the button
-      google.accounts.id.renderButton(
-        document.getElementById('google-signin-button'),
-        { theme: 'outline', size: 'large', width: '100%' }
-      );
-
-      // Also try to show the One Tap prompt
-      google.accounts.id.prompt();
-
-      setLoading(false);
-    } catch (err: any) {
-      setError(err.message || 'Google authentication failed');
+        if (result.token) {
+          onLogin(result.user, result.token, result.refreshToken);
+        } else {
+          throw new Error('No authentication token received');
+        }
+      } catch (err: any) {
+        setError(err.message || 'Google authentication failed');
+      } finally {
+        setLoading(false);
+      }
+    },
+    onError: () => {
+      setError('Google authentication failed');
       setLoading(false);
     }
+  });
+
+  const handleGoogleAuth = () => {
+    googleLogin();
   };
 
   // --- Email Login ---
@@ -226,8 +198,6 @@ const AuthForm: React.FC<AuthFormProps> = ({ userType, onLogin }) => {
             </svg>
             Continue with Google
           </button>
-          {/* Container for Google-rendered button */}
-          <div id="google-signin-button" className="hidden"></div>
         </div>
       )}
 
