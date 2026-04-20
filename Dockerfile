@@ -11,7 +11,8 @@ COPY . ./
 # so production builds include VITE_GOOGLE_CLIENT_ID, base URLs, etc.
 RUN if [ -f env.json ]; then \
       node -e "const e=require('./env.json'); for (const [k,v] of Object.entries(e)) { if (k.startsWith('VITE_')) process.stdout.write(k+'='+String(v)+'\\n'); }" > .env.build; \
-      export $(cat .env.build | xargs) && npm run build; \
+      set -a && . ./.env.build && set +a; \
+      npm run build; \
     else \
       npm run build; \
     fi
