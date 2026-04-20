@@ -11,6 +11,7 @@ build
 *.tsbuildinfo
 
 # Environment variables
+env.json
 .env
 .env.local
 .env.development.local
