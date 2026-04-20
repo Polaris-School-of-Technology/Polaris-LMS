@@ -95,6 +95,7 @@ const AuthForm: React.FC<AuthFormProps> = ({ userType, onLogin }) => {
     setError('');
 
     try {
+    
       const credentials = { email: formData.email, password: formData.password };
 
       const result =
@@ -152,7 +153,8 @@ const AuthForm: React.FC<AuthFormProps> = ({ userType, onLogin }) => {
         <div className="mb-6 w-full">
           {googleClientId ? (
             <GoogleOAuthProvider clientId={googleClientId}>
-              <div className="w-full [&>div]:!w-full">
+              <div className="flex w-full justify-center">
+                <div className="w-full max-w-md [&>div]:!w-full">
                 <GoogleLogin
                   onSuccess={(credentialResponse) => {
                     const cred = credentialResponse.credential;
@@ -173,8 +175,9 @@ const AuthForm: React.FC<AuthFormProps> = ({ userType, onLogin }) => {
                   shape="rectangular"
                   size="large"
                   text="continue_with"
-                  width="100%"
+                  width={400}
                 />
+                </div>
               </div>
             </GoogleOAuthProvider>
           ) : (
