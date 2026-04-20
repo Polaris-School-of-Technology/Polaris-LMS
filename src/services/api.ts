@@ -7,6 +7,32 @@ const UMS_BASE_URL = import.meta.env.VITE_UMS_BASE_URL || 'https://ums-672553132
 const LMS_BASE_URL = import.meta.env.VITE_LMS_BASE_URL || 'https://live-class-lms1-672553132888.asia-south1.run.app'; // Live Class LMS Backend
 const VOD_BASE_URL = 'https://prod-video-transcoding.polariscampus.com/v1/vod';
 
+/** Student Google ID token (JWT) against Live LMS. */
+export async function lmsStudentGoogleLogin(credential: string) {
+  const response = await fetch(`${LMS_BASE_URL}/api/v1/auth/student/google`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ credential }),
+  });
+  let data: Record<string, unknown> = {};
+  try {
+    data = (await response.json()) as Record<string, unknown>;
+  } catch {
+    /* empty */
+  }
+  if (!response.ok) {
+    throw new Error((data.message as string) || 'Google login failed');
+  }
+  const token =
+    response.headers.get('x-access-token') || (typeof data.token === 'string' ? data.token : null);
+  if (!token) {
+    throw new Error('No authentication token received');
+  }
+  const refreshToken =
+    typeof data.refreshToken === 'string' ? data.refreshToken : undefined;
+  return { user: data.user, token, refreshToken };
+}
+
 // Token storage and refresh functionality
 let refreshTokenPromise: Promise<string> | null = null;
 
@@ -532,27 +558,6 @@ const umsApi = {
       const refreshToken = data.refreshToken || response.headers.get('x-refresh-token') || response.headers.get('refresh-token');
 
       return { user: data.user, token, refreshToken };
-    },
-
-    // Google OAuth Login - Student
-    studentGoogleLogin: async (token: string) => {
-      const response = await fetch(`${UMS_BASE_URL}/ums/api/auth/student/login`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ token }),
-      });
-
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.message || 'Google login failed');
-      }
-
-      const data = await response.json();
-      const accessToken = response.headers.get('x-access-token');
-      // Extract refreshToken from response body or headers
-      const refreshToken = data.refreshToken || response.headers.get('x-refresh-token') || response.headers.get('refresh-token');
-
-      return { user: data.user, token: accessToken, refreshToken };
     },
 
     // Google OAuth Login - Faculty

@@ -4,6 +4,7 @@ import {
   useHMSActions,
   useHMSStore,
   useHMSNotifications,
+  HMSNotificationTypes,
   selectPeers,
   selectIsLocalAudioEnabled,
   selectIsLocalVideoEnabled,
@@ -43,6 +44,7 @@ const StudentLiveRoom: React.FC = () => {
   const isLocalVideoEnabled = useHMSStore(selectIsLocalVideoEnabled);
   const isConnected = useHMSStore(selectIsConnectedToRoom);
   const notification = useHMSNotifications();
+  const nameUpdatedNotification = useHMSNotifications(HMSNotificationTypes.NAME_UPDATED);
 
   const [isJoining, setIsJoining] = useState(true);
   const [isLeaving, setIsLeaving] = useState(false);
@@ -53,6 +55,8 @@ const StudentLiveRoom: React.FC = () => {
   const [showParticipants, setShowParticipants] = useState(false);
   const [isScreenSharing, setIsScreenSharing] = useState(false);
   const hadTutorBeforeRef = useRef(false);
+  /** Canonical display name for this session; re-applied if the student role allows HMS rename in template. */
+  const lockedStudentDisplayNameRef = useRef<string | null>(null);
 
   const sessionToken = useMemo(() => {
     return localStorage.getItem('live_class_token');
@@ -155,6 +159,19 @@ const StudentLiveRoom: React.FC = () => {
     }
   }, [notification, handleAutoLeave]);
 
+  useEffect(() => {
+    if (!nameUpdatedNotification || nameUpdatedNotification.type !== HMSNotificationTypes.NAME_UPDATED) {
+      return;
+    }
+    const peer = nameUpdatedNotification.data;
+    if (!peer?.isLocal) return;
+    const locked = lockedStudentDisplayNameRef.current;
+    if (!locked || peer.name === locked) return;
+    hmsActions.changeName(locked).catch(() => {
+      /* template may forbid changeName; webhook may still reset on join */
+    });
+  }, [nameUpdatedNotification, hmsActions]);
+
   const prevConnectedRef = useRef<boolean | null>(null);
 
   useEffect(() => {
@@ -230,9 +247,11 @@ const StudentLiveRoom: React.FC = () => {
   const joinRoom = async (authToken: string) => {
     try {
       setIsJoining(true);
+      const displayName = sessionData?.studentName || sessionData?.student || 'Student';
+      lockedStudentDisplayNameRef.current = displayName;
       await hmsActions.join({
         authToken,
-        userName: sessionData?.studentName || sessionData?.student || 'Student',
+        userName: displayName,
         settings: {
           isAudioMuted: true,
           isVideoMuted: true,
@@ -241,6 +260,7 @@ const StudentLiveRoom: React.FC = () => {
       setIsJoining(false);
     } catch (err: any) {
       console.error('Failed to join student room:', err);
+      lockedStudentDisplayNameRef.current = null;
       setError(err?.message || 'Failed to join live class. Please try again.');
       setIsJoining(false);
       setHasAttemptedJoin(false);
